@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+:root {
+  --navy-950: #060d1c;
+  --navy-900: #0a1628;
+  --navy-800: #0f2038;
+  --navy-700: #16294f;
+  --navy-600: #1e3a66;
+  --navy-500: #2a4d85;
+
+  --gold-600: #a9821b;
+  --gold-500: #c9a227;
+  --gold-400: #d4b84a;
+  --gold-300: #e3cd7f;
+  --gold-100: #f5ecd0;
+
+  --cream-50: #faf7f0;
+  --cream-100: #f3ecdc;
+
+  --ink-900: #171c26;
+  --ink-600: #4b5563;
+}
+
+@theme inline {
+  --color-navy-950: var(--navy-950);
+  --color-navy-900: var(--navy-900);
+  --color-navy-800: var(--navy-800);
+  --color-navy-700: var(--navy-700);
+  --color-navy-600: var(--navy-600);
+  --color-navy-500: var(--navy-500);
+
+  --color-gold-600: var(--gold-600);
+  --color-gold-500: var(--gold-500);
+  --color-gold-400: var(--gold-400);
+  --color-gold-300: var(--gold-300);
+  --color-gold-100: var(--gold-100);
+
+  --color-cream-50: var(--cream-50);
+  --color-cream-100: var(--cream-100);
+
+  --color-ink-900: var(--ink-900);
+  --color-ink-600: var(--ink-600);
+
+  --font-display: var(--font-display);
+  --font-sans: var(--font-sans);
+}
+
+body {
+  background: var(--cream-50);
+  color: var(--ink-900);
+}
+
+::selection {
+  background: var(--gold-300);
+  color: var(--navy-950);
+}
+
+html {
+  scroll-behavior: smooth;
+}

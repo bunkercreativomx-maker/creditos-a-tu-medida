@@ -1,0 +1,125 @@
+import { NextRequest, NextResponse } from "next/server";
+import { verifyZernioSignature, sendWhatsAppMessage, type ZernioInboundEvent } from "@/lib/zernio";
+import { runBotTurn } from "@/lib/bot";
+import { createAdminClient } from "@/lib/pocketbase-admin";
+
+export async function POST(req: NextRequest) {
+  const rawBody = await req.text();
+  const signature = req.headers.get("X-Zernio-Signature");
+
+  if (!verifyZernioSignature(rawBody, signature)) {
+    return NextResponse.json({ error: "Firma inválida" }, { status: 401 });
+  }
+
+  const event = JSON.parse(rawBody) as ZernioInboundEvent;
+  const pb = await createAdminClient();
+
+  // Idempotencia: descarta reintentos del mismo evento (Zernio reintenta hasta 7 veces).
+  const existing = await pb
+    .collection("processed_webhook_events")
+    .getFirstListItem(`event_id = "${event.id}"`)
+    .catch(() => null);
+
+  if (existing) {
+    return NextResponse.json({ ok: true, deduped: true });
+  }
+
+  if (event.event !== "message.received") {
+    return NextResponse.json({ ok: true, ignored: event.event });
+  }
+
+  const telefono = event.data.from;
+  const texto = event.data.text;
+  if (!telefono || !texto) {
+    return NextResponse.json({ ok: true, ignored: "payload incompleto" });
+  }
+
+  // Upsert lead por teléfono
+  const existingLead = await pb
+    .collection("leads")
+    .getFirstListItem(`telefono = "${telefono}"`)
+    .catch(() => null);
+
+  let leadId: string;
+  if (existingLead) {
+    leadId = existingLead.id;
+  } else {
+    const newLead = await pb.collection("leads").create({
+      telefono,
+      nombre: event.data.contact_name ?? null,
+      origen: "whatsapp",
+      status: "nuevo",
+    });
+    leadId = newLead.id;
+  }
+
+  // Upsert conversation por teléfono
+  const existingConversation = await pb
+    .collection("conversations")
+    .getFirstListItem(`telefono = "${telefono}"`)
+    .catch(() => null);
+
+  let conversationId: string;
+  let botActivo = true;
+  if (existingConversation) {
+    conversationId = existingConversation.id;
+    botActivo = existingConversation.bot_activo;
+  } else {
+    const newConversation = await pb.collection("conversations").create({
+      lead: leadId,
+      telefono,
+      canal: "whatsapp",
+      bot_activo: true,
+    });
+    conversationId = newConversation.id;
+    botActivo = newConversation.bot_activo;
+  }
+
+  await pb.collection("messages").create({
+    conversation: conversationId,
+    remitente: "cliente",
+    contenido: texto,
+  });
+
+  if (!botActivo) {
+    return NextResponse.json({ ok: true, bot: "inactivo" });
+  }
+
+  // Arma el historial reciente para el bot
+  const recentMessages = await pb
+    .collection("messages")
+    .getList(1, 20, {
+      filter: `conversation = "${conversationId}"`,
+      sort: "created",
+    });
+
+  const history = (recentMessages.items ?? [] as unknown as { remitente: string; contenido: string }[])
+    .filter((m) => m.remitente !== "asesor")
+    .map((m) => ({
+      role: (m.remitente === "cliente" ? "user" : "assistant") as "user" | "assistant",
+      content: m.contenido,
+    }));
+
+  const botResult = await runBotTurn(history);
+
+  if (botResult.reply) {
+    await sendWhatsAppMessage(telefono, botResult.reply);
+    await pb.collection("messages").create({
+      conversation: conversationId,
+      remitente: "bot",
+      contenido: botResult.reply,
+    });
+  }
+
+  if (botResult.escalate) {
+    await pb
+      .collection("conversations")
+      .update(conversationId, { bot_activo: false });
+    await pb.collection("leads").update(leadId, { status: "en_seguimiento" });
+  }
+
+  // Marcar como procesado SOLO después de éxito (evita perder reintentos)
+  await pb.collection("processed_webhook_events").create({ event_id: event.id });
+
+  return NextResponse.json({ ok: true });
+}
