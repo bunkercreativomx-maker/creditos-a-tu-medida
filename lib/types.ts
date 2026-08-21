@@ -102,6 +102,47 @@ export type Message = PbMessage;
 export type LeadNote = PbLeadNote;
 export type Profile = PbUser;
 
+/** Registro de la colección `financieras`. */
+export type PbFinanciera = {
+  id: string;
+  nombre: string;
+  activa: boolean;
+  created: string;
+  updated: string;
+};
+
+export type OperacionStatus = "pendiente" | "en_proceso" | "aprobado" | "finalizado" | "no_cumple";
+export type OperacionTipo = "pensionado" | "jubilado";
+
+/** Registro de la colección `operaciones` (tablero de financieras por lead). */
+export type PbOperacion = {
+  id: string;
+  lead: string;
+  financiera: string | null;
+  monto_prestado: number | null;
+  comision: number | null;
+  status: OperacionStatus | null;
+  comentarios: string | null;
+  tipo: OperacionTipo | null;
+  created: string;
+  updated: string;
+};
+
+export type CitaTipo = "llamada" | "cita" | "seguimiento" | "documentos";
+
+/** Registro de la colección `citas` (calendario). */
+export type PbCita = {
+  id: string;
+  lead: string | null;
+  titulo: string | null;
+  fecha: string;
+  tipo: CitaTipo | null;
+  asignado_a: string | null;
+  notas: string | null;
+  created: string;
+  updated: string;
+};
+
 /** Estructura del cliente PocketBase tipado para conveniencia de lectura. */
 export type Database = {
   collections: Record<string, unknown>;
