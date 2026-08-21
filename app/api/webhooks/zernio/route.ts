@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
     .collection("messages")
     .getList(1, 20, {
       filter: `conversation = "${conversationId}"`,
-      sort: "created",
+      sort: "-id",
     });
 
   const history = (recentMessages.items ?? [] as unknown as { remitente: string; contenido: string }[])

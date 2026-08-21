@@ -13,7 +13,7 @@ export default async function UsuariosPage() {
   }
 
   const result = await pb.collection("users").getList(1, 500, {
-    sort: "created",
+    sort: "id",
   });
   const profiles = result.items as unknown as PbUser[];
 

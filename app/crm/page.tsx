@@ -14,7 +14,7 @@ const COLUMNS: { status: LeadStatus; label: string }[] = [
 export default async function CrmDashboard() {
   const pb = await createServerClient();
   const result = await pb.collection("leads").getList(1, 500, {
-    sort: "-created",
+    sort: "-id",
   });
   const leads = result.items as unknown as PbLead[];
 

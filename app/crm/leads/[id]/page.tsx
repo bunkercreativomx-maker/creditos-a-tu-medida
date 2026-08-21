@@ -51,7 +51,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   const [notesResult, conversationResult, documentLinks] = await Promise.all([
     pb
       .collection("lead_notes")
-      .getList(1, 200, { filter: `lead = "${id}"`, sort: "-created" }),
+      .getList(1, 200, { filter: `lead = "${id}"`, sort: "-id" }),
     pb
       .collection("conversations")
       .getFirstListItem(`lead = "${id}"`)
@@ -66,7 +66,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   if (conversation) {
     const msgResult = await pb
       .collection("messages")
-      .getList(1, 200, { filter: `conversation = "${conversation.id}"`, sort: "created" });
+      .getList(1, 200, { filter: `conversation = "${conversation.id}"`, sort: "id" });
     messages = msgResult.items as unknown as PbMessage[];
   }
 
