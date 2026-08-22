@@ -1,29 +1,32 @@
-import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 import { createBaseClient } from "@/lib/pocketbase";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   const out: Record<string, unknown> = { pb_url: process.env.NEXT_PUBLIC_PB_URL ?? "(fallback)" };
-  const cookie = req.headers.get("cookie") ?? "";
-  out.has_cookie = cookie.includes("pb_auth");
-  try {
-    const pb = createBaseClient();
-    // Mismo flujo que createServerClient:
-    const authCookie = cookie.split(";").find((c) => c.trim().startsWith("pb_auth="))?.trim().split("=").slice(1).join("=") ?? "";
-    if (authCookie) {
-      pb.authStore.loadFromCookie(authCookie, "pb_auth");
-      out.cookie_isValid = pb.authStore.isValid;
-      try {
-        if (pb.authStore.isValid) {
-          await pb.collection("users").authRefresh();
-          out.authRefresh = "OK";
-          out.refresh_isValid = pb.authStore.isValid;
-        }
-      } catch (e) {
-        out.authRefresh = "FALLO: " + (e as Error).message;
+  const pb = createBaseClient();
+  const cookieStore = await cookies();
+  const pbAuthValue = cookieStore.get("pb_auth")?.value ?? "";
+  out.has_cookie = Boolean(pbAuthValue);
+
+  // Réplica EXACTA de createServerClient (el fix):
+  if (pbAuthValue) {
+    pb.authStore.loadFromCookie(`pb_auth=${pbAuthValue}`, "pb_auth");
+    out.cookie_isValid = pb.authStore.isValid;
+    try {
+      if (pb.authStore.isValid) {
+        await pb.collection("users").authRefresh();
+        out.authRefresh = "OK";
+        out.refresh_isValid = pb.authStore.isValid;
       }
-    } else {
-      out.cookie_isValid = "sin cookie";
+    } catch (e) {
+      out.authRefresh = "FALLO: " + (e as Error).message;
     }
+  } else {
+    out.cookie_isValid = "sin cookie";
+  }
+
+  try {
     const r = await pb.collection("leads").getList(1, 500, { sort: "-id" });
     out.leads = r.totalItems;
   } catch (e) {
