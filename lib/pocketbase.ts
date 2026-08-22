@@ -6,6 +6,7 @@ import type { Database } from "@/lib/types";
  * - NEXT_PUBLIC_PB_URL: se define en Vercel (o .env.local en desarrollo).
  * - Fallback para PRODUCCIÓN: el túnel público del servidor (alcanzable desde
  *   cualquier navegador). Solo se usa 127.0.0.1:8092 en desarrollo local.
+ * - v2: apunta al túnel público https://creditos-pb.bunkeragent.cloud
  */
 export const PB_URL =
   process.env.NODE_ENV === "production"
