@@ -10,10 +10,12 @@ export async function createServerClient() {
   const pb = createBaseClient();
 
   const cookieStore = await cookies();
-  const authCookie = cookieStore.get("pb_auth")?.value ?? "";
+  const pbAuthValue = cookieStore.get("pb_auth")?.value ?? "";
 
-  if (authCookie) {
-    pb.authStore.loadFromCookie(authCookie, "pb_auth");
+  if (pbAuthValue) {
+    // loadFromCookie espera el string completo "pb_auth=<valor>",
+    // no solo el valor (isValid sería false si pasamos solo el value).
+    pb.authStore.loadFromCookie(`pb_auth=${pbAuthValue}`, "pb_auth");
     try {
       if (pb.authStore.isValid) {
         await pb.collection("users").authRefresh();
