@@ -124,6 +124,7 @@ export type PbOperacion = {
   status: OperacionStatus | null;
   comentarios: string | null;
   tipo: OperacionTipo | null;
+  fecha_desembolso: string | null;
   created: string;
   updated: string;
 };

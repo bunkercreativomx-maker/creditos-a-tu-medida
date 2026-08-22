@@ -17,6 +17,15 @@ const TIPO_OPTIONS: { value: OperacionTipo; label: string }[] = [
   { value: "jubilado", label: "Jubilado" },
 ];
 
+/** Convierte fecha PB (ISO) a valor para <input type="date"> (YYYY-MM-DD). */
+function toDateValue(v: string | null | undefined): string {
+  if (!v) return "";
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 export function FinancierasBoard({
   leads,
   financieras,
@@ -72,16 +81,17 @@ export function FinancierasBoard({
 
       {/* Tabla */}
       <div className="flex-1 overflow-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full min-w-[900px] text-sm">
+        <table className="w-full min-w-[1000px] text-sm">
           <thead className="sticky top-0 bg-slate-50 text-left text-xs uppercase text-slate-500">
             <tr>
               <th className="px-4 py-3 font-semibold">Lead</th>
-              <th className="px-4 py-3 font-semibold">Financiera</th>
               <th className="px-4 py-3 font-semibold">Monto prestado</th>
               <th className="px-4 py-3 font-semibold">Comisión</th>
+              <th className="px-4 py-3 font-semibold">Financiera</th>
               <th className="px-4 py-3 font-semibold">Status</th>
               <th className="px-4 py-3 font-semibold">Comentarios</th>
               <th className="px-4 py-3 font-semibold">Tipo</th>
+              <th className="px-4 py-3 font-semibold">Fecha desembolso</th>
               <th className="px-4 py-3 font-semibold text-right">Acciones</th>
             </tr>
           </thead>
@@ -100,7 +110,7 @@ export function FinancierasBoard({
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-10 text-center text-slate-400">
+                <td colSpan={9} className="px-4 py-10 text-center text-slate-400">
                   Sin operaciones registradas
                 </td>
               </tr>
@@ -146,24 +156,13 @@ function Row({
   const [monto, setMonto] = useState(op.monto_prestado ?? "");
   const [comision, setComision] = useState(op.comision ?? "");
   const [comentarios, setComentarios] = useState(op.comentarios ?? "");
+  const [fechaDesembolso, setFechaDesembolso] = useState(toDateValue(op.fecha_desembolso));
 
   const commit = (data: Record<string, unknown>) => onUpdate(data);
 
   return (
     <tr className="hover:bg-slate-50/60">
       <td className="px-4 py-2.5 font-medium text-slate-800">{leadName}</td>
-      <td className="px-4 py-2.5">
-        <select
-          value={op.financiera ?? ""}
-          onChange={(e) => commit({ financiera: e.target.value || null })}
-          className="w-full rounded-md border border-slate-200 px-2 py-1 text-sm"
-        >
-          <option value="">—</option>
-          {financieras.map((f) => (
-            <option key={f.id} value={f.id}>{f.nombre}</option>
-          ))}
-        </select>
-      </td>
       <td className="px-4 py-2.5">
         <input
           type="number"
@@ -183,6 +182,18 @@ function Row({
           onBlur={() => comision !== op.comision && commit({ comision: comision })}
           className="w-24 rounded-md border border-slate-200 px-2 py-1 text-sm"
         />
+      </td>
+      <td className="px-4 py-2.5">
+        <select
+          value={op.financiera ?? ""}
+          onChange={(e) => commit({ financiera: e.target.value || null })}
+          className="w-full rounded-md border border-slate-200 px-2 py-1 text-sm"
+        >
+          <option value="">—</option>
+          {financieras.map((f) => (
+            <option key={f.id} value={f.id}>{f.nombre}</option>
+          ))}
+        </select>
       </td>
       <td className="px-4 py-2.5">
         <select
@@ -224,6 +235,15 @@ function Row({
             <option key={t.value} value={t.value}>{t.label}</option>
           ))}
         </select>
+      </td>
+      <td className="px-4 py-2.5">
+        <input
+          type="date"
+          value={fechaDesembolso}
+          onChange={(e) => setFechaDesembolso(e.target.value)}
+          onBlur={() => fechaDesembolso !== toDateValue(op.fecha_desembolso) && commit({ fecha_desembolso: fechaDesembolso || null })}
+          className="rounded-md border border-slate-200 px-2 py-1 text-sm"
+        />
       </td>
       <td className="px-4 py-2.5 text-right">
         <button
