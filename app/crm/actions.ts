@@ -42,7 +42,13 @@ export async function createLead(data: Record<string, unknown>) {
 export async function updateLead(leadId: string, data: Record<string, unknown>) {
   const pb = await createServerClient();
   const payload: Record<string, unknown> = {};
-  for (const key of ["nombre", "apellido", "email", "producto_interes", "monto_aproximado", "banco", "institucion"]) {
+  for (const key of [
+    "nombre", "apellido", "email", "telefono",
+    "producto_interes", "monto_aproximado",
+    "banco", "institucion", "curp", "rfc", "nss", "clabe",
+    "tipo_credito", "fecha_nacimiento", "lugar_nacimiento",
+    "genero", "estado_civil",
+  ]) {
     if (key in data) payload[key] = data[key] ? String(data[key]) : null;
   }
   try {

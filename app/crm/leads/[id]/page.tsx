@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { createServerClient } from "@/lib/pocketbase-server";
 import { PB_URL } from "@/lib/pocketbase";
-import { NoteForm, AdvisorMessageForm, BotToggle } from "@/components/crm/LeadDetailForms";
+import { NoteForm, AdvisorMessageForm, BotToggle, LeadDataEditor } from "@/components/crm/LeadDetailForms";
 import type { PbLead, PbConversation, PbMessage, PbLeadNote } from "@/lib/types";
 
 const DOCUMENTS: { key: keyof PbLead; label: string }[] = [
@@ -96,17 +96,13 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       </div>
 
       <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="font-semibold text-blue-900">Datos financieros</h2>
-        <dl className="mt-4 grid grid-cols-2 gap-3 text-sm text-slate-600 sm:grid-cols-3">
-          <Field label="CURP" value={lead.curp} />
-          <Field label="RFC" value={lead.rfc} />
-          <Field label="Número de Pensión / NSS" value={lead.nss} />
-          <Field label="Institución" value={lead.institucion} />
-          <Field label="Tipo de crédito" value={lead.tipo_credito} capitalize />
-          <Field label="Monto aproximado" value={lead.monto_aproximado} />
-          <Field label="Banco" value={lead.banco} />
-          <Field label="CLABE" value={lead.clabe} />
-        </dl>
+        <h2 className="font-semibold text-blue-900">Datos del lead (editable)</h2>
+        <p className="mt-0.5 text-xs text-slate-400">
+          Modifica cualquier campo (CURP, RFC, NSS, banco, CLABE, tipo de crédito, etc.) y pulsa "Guardar cambios".
+        </p>
+        <div className="mt-4">
+          <LeadDataEditor lead={lead} />
+        </div>
       </div>
 
       <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">

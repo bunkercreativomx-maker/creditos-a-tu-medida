@@ -1,7 +1,110 @@
 "use client";
 
-import { useRef, useTransition } from "react";
-import { addLeadNote, sendAdvisorMessage, toggleBotActivo } from "@/app/crm/actions";
+import { useRef, useState, useTransition } from "react";
+import { addLeadNote, sendAdvisorMessage, toggleBotActivo, updateLead } from "@/app/crm/actions";
+import type { PbLead, Genero, EstadoCivil, TipoCredito } from "@/lib/types";
+
+/** Edición inline de los datos del lead (CURP, RFC, NSS, banco, CLABE, etc.). */
+export function LeadDataEditor({ lead }: { lead: PbLead }) {
+  const [isPending, startTransition] = useTransition();
+  const [saved, setSaved] = useState(false);
+  const [form, setForm] = useState(() => ({
+    nombre: lead.nombre ?? "",
+    apellido: lead.apellido ?? "",
+    email: lead.email ?? "",
+    telefono: lead.telefono ?? "",
+    producto_interes: lead.producto_interes ?? "",
+    monto_aproximado: lead.monto_aproximado ?? "",
+    banco: lead.banco ?? "",
+    institucion: lead.institucion ?? "",
+    curp: lead.curp ?? "",
+    rfc: lead.rfc ?? "",
+    nss: lead.nss ?? "",
+    clabe: lead.clabe ?? "",
+    tipo_credito: lead.tipo_credito ?? "",
+    fecha_nacimiento: lead.fecha_nacimiento ?? "",
+    lugar_nacimiento: lead.lugar_nacimiento ?? "",
+    genero: lead.genero ?? "",
+    estado_civil: lead.estado_civil ?? "",
+  }));
+
+  function set(k: keyof typeof form, v: string) {
+    setForm((f) => ({ ...f, [k]: v }));
+  }
+
+  function save() {
+    startTransition(async () => {
+      await updateLead(lead.id, form);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    });
+  }
+
+  const inputCls = "w-full rounded-md border border-slate-200 px-2 py-1.5 text-sm";
+
+  return (
+    <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+      <Field label="Nombre" input={<input className={inputCls} value={form.nombre} onChange={(e) => set("nombre", e.target.value)} />} />
+      <Field label="Apellido" input={<input className={inputCls} value={form.apellido} onChange={(e) => set("apellido", e.target.value)} />} />
+      <Field label="Teléfono" input={<input className={inputCls} value={form.telefono} onChange={(e) => set("telefono", e.target.value)} />} />
+      <Field label="Email" input={<input className={inputCls} value={form.email} onChange={(e) => set("email", e.target.value)} />} />
+      <Field label="Sector" input={<input className={inputCls} value={form.producto_interes} onChange={(e) => set("producto_interes", e.target.value)} />} />
+      <Field label="Monto aprox." input={<input className={inputCls} value={form.monto_aproximado} onChange={(e) => set("monto_aproximado", e.target.value)} />} />
+      <Field label="CURP" input={<input className={inputCls} value={form.curp} onChange={(e) => set("curp", e.target.value)} />} />
+      <Field label="RFC" input={<input className={inputCls} value={form.rfc} onChange={(e) => set("rfc", e.target.value)} />} />
+      <Field label="Núm. de Pensión / NSS" input={<input className={inputCls} value={form.nss} onChange={(e) => set("nss", e.target.value)} />} />
+      <Field label="Banco" input={<input className={inputCls} value={form.banco} onChange={(e) => set("banco", e.target.value)} />} />
+      <Field label="CLABE" input={<input className={inputCls} value={form.clabe} onChange={(e) => set("clabe", e.target.value)} />} />
+      <Field label="Institución" input={<input className={inputCls} value={form.institucion} onChange={(e) => set("institucion", e.target.value)} />} />
+      <Field label="Tipo de crédito" input={
+        <select className={inputCls} value={form.tipo_credito} onChange={(e) => set("tipo_credito", e.target.value)}>
+          <option value="">—</option>
+          <option value="nuevo">Nuevo</option>
+          <option value="renovacion">Renovación</option>
+        </select>
+      } />
+      <Field label="Fecha de nacimiento" input={<input className={inputCls} value={form.fecha_nacimiento} onChange={(e) => set("fecha_nacimiento", e.target.value)} placeholder="YYYY-MM-DD" />} />
+      <Field label="Lugar de nacimiento" input={<input className={inputCls} value={form.lugar_nacimiento} onChange={(e) => set("lugar_nacimiento", e.target.value)} />} />
+      <Field label="Género" input={
+        <select className={inputCls} value={form.genero} onChange={(e) => set("genero", e.target.value)}>
+          <option value="">—</option>
+          <option value="masculino">Masculino</option>
+          <option value="femenino">Femenino</option>
+        </select>
+      } />
+      <Field label="Estado civil" input={
+        <select className={inputCls} value={form.estado_civil} onChange={(e) => set("estado_civil", e.target.value)}>
+          <option value="">—</option>
+          <option value="soltero">Soltero(a)</option>
+          <option value="casado">Casado(a)</option>
+          <option value="divorciado">Divorciado(a)</option>
+          <option value="viudo">Viudo(a)</option>
+          <option value="union_libre">Unión Libre</option>
+        </select>
+      } />
+
+      <div className="col-span-2 flex items-center gap-3 sm:col-span-3">
+        <button
+          disabled={isPending}
+          onClick={save}
+          className="rounded-lg bg-blue-900 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-60"
+        >
+          {isPending ? "Guardando..." : "💾 Guardar cambios"}
+        </button>
+        {saved && <span className="text-sm font-medium text-emerald-600">✓ Guardado</span>}
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, input }: { label: string; input: React.ReactNode }) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-xs text-slate-500">{label}</span>
+      {input}
+    </label>
+  );
+}
 
 export function NoteForm({ leadId }: { leadId: string }) {
   const ref = useRef<HTMLFormElement>(null);
