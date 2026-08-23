@@ -129,6 +129,8 @@ export async function createOperacion(data: Record<string, unknown>) {
     comentarios: data.comentarios ? String(data.comentarios) : null,
     tipo: (data.tipo as OperacionTipo) ?? null,
     fecha_desembolso: data.fecha_desembolso ? String(data.fecha_desembolso) : null,
+    fecha_vencimiento: data.fecha_vencimiento ? String(data.fecha_vencimiento) : null,
+    plazo_meses: data.plazo_meses ? Number(data.plazo_meses) : null,
   };
   await pb.collection("operaciones").create(payload);
   revalidatePath("/crm/financieras");
@@ -144,6 +146,8 @@ export async function updateOperacion(operacionId: string, data: Record<string, 
   if ("comentarios" in data) payload.comentarios = data.comentarios ? String(data.comentarios) : null;
   if ("tipo" in data) payload.tipo = data.tipo;
   if ("fecha_desembolso" in data) payload.fecha_desembolso = data.fecha_desembolso ? String(data.fecha_desembolso) : null;
+  if ("fecha_vencimiento" in data) payload.fecha_vencimiento = data.fecha_vencimiento ? String(data.fecha_vencimiento) : null;
+  if ("plazo_meses" in data) payload.plazo_meses = data.plazo_meses ? Number(data.plazo_meses) : null;
   await pb.collection("operaciones").update(operacionId, payload);
   revalidatePath("/crm/financieras");
 }

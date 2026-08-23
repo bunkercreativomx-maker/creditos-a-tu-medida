@@ -7,6 +7,7 @@ import { createClient } from "@/lib/pocketbase-client";
 const TABS = [
   { href: "/crm", label: "Pipeline", icon: "📊" },
   { href: "/crm/financieras", label: "Financieras", icon: "🏦" },
+  { href: "/crm/renovaciones", label: "Renovaciones", icon: "🔔" },
   { href: "/crm/calendario", label: "Calendario", icon: "📅" },
   { href: "/crm/vendedores", label: "Vendedores", icon: "👥" },
 ];

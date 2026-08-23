@@ -125,6 +125,8 @@ export type PbOperacion = {
   comentarios: string | null;
   tipo: OperacionTipo | null;
   fecha_desembolso: string | null;
+  fecha_vencimiento: string | null;
+  plazo_meses: number | null;
   created: string;
   updated: string;
 };
