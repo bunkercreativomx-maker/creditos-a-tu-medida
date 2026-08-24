@@ -52,10 +52,13 @@ export function RenovacionesBoard({
     .map((op) => ({ op, dias: diasRestantes(op.fecha_vencimiento) ?? 9999 }))
     .sort((a, b) => a.dias - b.dias);
 
-  // Los que vencen en 60 días o menos (por renovar pronto) y los ya vencidos/por vencer
-  const porRenovar = conVencimiento.filter((x) => x.dias <= 60);
+  // Umbral de aviso: 4 meses (120 días)
+  const UMBRAL_DIAS = 120;
+
+  // Los que vencen en 120 días o menos (por renovar pronto) y los ya vencidos/por vencer
+  const porRenovar = conVencimiento.filter((x) => x.dias <= UMBRAL_DIAS);
   // Los próximos a vencer (más adelante)
-  const proximos = conVencimiento.filter((x) => x.dias > 60);
+  const proximos = conVencimiento.filter((x) => x.dias > UMBRAL_DIAS);
 
   return (
     <div className="flex h-[calc(100vh-160px)] flex-col">
@@ -63,7 +66,7 @@ export function RenovacionesBoard({
         <div>
           <h1 className="text-lg font-bold tracking-tight">🔔 Créditos por renovar</h1>
           <p className="text-xs text-slate-400">
-            Créditos activos que vencen en 60 días o menos — listos para contactar y ofrecer renovación
+            Créditos activos que vencen en 120 días (4 meses) o menos — listos para contactar y ofrecer renovación
           </p>
         </div>
         <span className="rounded-full bg-amber-500/90 px-4 py-1.5 text-sm font-bold">
@@ -78,14 +81,14 @@ export function RenovacionesBoard({
             <div className="text-4xl">🎉</div>
             <p className="mt-3 font-semibold text-slate-600">No hay créditos por renovar próximamente</p>
             <p className="mt-1 text-sm text-slate-400">
-              Cuando un crédito esté a 60 días o menos de su vencimiento, aparecerá aquí para que contactes al cliente.
+              Cuando un crédito esté a 120 días (4 meses) o menos de su vencimiento, aparecerá aquí para que contactes al cliente.
             </p>
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
             {porRenovar.map(({ op, dias }) => {
-              const urgente = dias <= 15;
-              const muyPronto = dias <= 30;
+              const urgente = dias <= 30;      // dentro de 1 mes
+              const muyPronto = dias <= 60;    // dentro de 2 meses
               return (
                 <div key={op.id} className="flex items-center justify-between gap-3 px-5 py-4 hover:bg-slate-50/60">
                   <div className="flex items-center gap-4">
