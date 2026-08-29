@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useTransition, useState } from "react";
-import { claimLead } from "@/app/crm/actions";
+import { claimLead, deleteLead } from "@/app/crm/actions";
 import type { PbLead } from "@/lib/types";
 
 export function LeadCard({
@@ -10,14 +11,19 @@ export function LeadCard({
   onDragStart,
   onDragEnd,
   isDragging,
+  isAdmin,
 }: {
   lead: PbLead;
   onDragStart: (e: React.DragEvent) => void;
   onDragEnd: () => void;
   isDragging: boolean;
+  isAdmin?: boolean;
 }) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [justClaimed, setJustClaimed] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const nombre = `${lead.nombre || "Sin nombre"} ${lead.apellido ?? ""}`.trim();
   const origen = lead.origen === "whatsapp" ? "WhatsApp" : "Web";
@@ -28,6 +34,19 @@ export function LeadCard({
       await claimLead(lead.id);
       setJustClaimed(true);
       setTimeout(() => setJustClaimed(false), 2000);
+    });
+  }
+
+  function handleDelete() {
+    setError(null);
+    startTransition(async () => {
+      try {
+        await deleteLead(lead.id);
+        router.refresh();
+      } catch (err) {
+        setError((err as Error)?.message ?? "Error al eliminar el lead");
+        setConfirmingDelete(false);
+      }
     });
   }
 
@@ -84,16 +103,52 @@ export function LeadCard({
         >
           {asignado || justClaimed ? "✓ Asignado a ti" : "Sin asignar"}
         </span>
-        {!asignado && (
-          <button
-            disabled={isPending}
-            onClick={handleClaim}
-            className="rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-50"
-          >
-            Tomar
-          </button>
-        )}
+        <div className="flex items-center gap-1.5">
+          {!asignado && (
+            <button
+              disabled={isPending}
+              onClick={handleClaim}
+              className="rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+            >
+              Tomar
+            </button>
+          )}
+          {isAdmin && !confirmingDelete && (
+            <button
+              disabled={isPending}
+              onClick={() => setConfirmingDelete(true)}
+              className="rounded-md bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-600 hover:bg-red-100 disabled:opacity-50"
+            >
+              Borrar
+            </button>
+          )}
+        </div>
       </div>
+
+      {confirmingDelete && (
+        <div className="mt-2 rounded-md border border-red-200 bg-red-50 p-2">
+          <p className="text-[11px] font-medium text-red-700">
+            ¿Eliminar a <span className="font-bold">{nombre}</span>? Se borrarán también sus operaciones, citas y notas.
+          </p>
+          {error && <p className="mt-1 text-[11px] text-red-600">{error}</p>}
+          <div className="mt-2 flex gap-2">
+            <button
+              disabled={isPending}
+              onClick={handleDelete}
+              className="rounded-md bg-red-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+            >
+              {isPending ? "Borrando..." : "Sí, eliminar"}
+            </button>
+            <button
+              disabled={isPending}
+              onClick={() => setConfirmingDelete(false)}
+              className="rounded-md bg-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-300"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

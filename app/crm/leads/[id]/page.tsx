@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { createServerClient } from "@/lib/pocketbase-server";
 import { PB_URL } from "@/lib/pocketbase";
-import { NoteForm, AdvisorMessageForm, BotToggle, LeadDataEditor } from "@/components/crm/LeadDetailForms";
+import { NoteForm, AdvisorMessageForm, BotToggle, LeadDataEditor, DeleteLeadButton } from "@/components/crm/LeadDetailForms";
 import type { PbLead, PbConversation, PbMessage, PbLeadNote } from "@/lib/types";
 
 const DOCUMENTS: { key: keyof PbLead; label: string }[] = [
@@ -40,6 +40,8 @@ async function getDocumentLinks(lead: PbLead) {
 export default async function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const pb = await createServerClient();
+  const user = pb.authStore.model as { role?: string } | null;
+  const isAdmin = user?.role === "admin";
 
   let lead: PbLead | null = null;
   try {
@@ -81,9 +83,17 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             <p className="text-sm text-slate-600">{lead.telefono}</p>
             {lead.email && <p className="text-sm text-slate-600">{lead.email}</p>}
           </div>
+        <div className="flex flex-col items-end gap-2">
           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium uppercase text-slate-500">
             {lead.origen === "whatsapp" ? "WhatsApp" : "Formulario web"}
           </span>
+          {isAdmin && (
+            <DeleteLeadButton
+              leadId={lead.id}
+              leadName={`${lead.nombre || "Sin nombre"} ${lead.apellido ?? ""}`.trim()}
+            />
+          )}
+        </div>
         </div>
         <dl className="mt-4 grid grid-cols-2 gap-3 text-sm text-slate-600 sm:grid-cols-3">
           <Field label="Status" value={lead.status.replace("_", " ")} capitalize />

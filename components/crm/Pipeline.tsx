@@ -6,7 +6,7 @@ import { PIPELINE_STAGES } from "./pipeline-stages";
 import { updateLeadStatus, createLead } from "@/app/crm/actions";
 import type { PbLead, LeadStatus } from "@/lib/types";
 
-export function Pipeline({ leads, vendedores }: { leads: PbLead[]; vendedores?: { id: string; name: string }[] }) {
+export function Pipeline({ leads, vendedores, isAdmin }: { leads: PbLead[]; vendedores?: { id: string; name: string }[]; isAdmin?: boolean }) {
   const [isPending, startTransition] = useTransition();
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overStage, setOverStage] = useState<LeadStatus | null>(null);
@@ -92,6 +92,7 @@ export function Pipeline({ leads, vendedores }: { leads: PbLead[]; vendedores?: 
                   <LeadCard
                     key={lead.id}
                     lead={lead}
+                    isAdmin={isAdmin}
                     isDragging={draggingId === lead.id}
                     onDragStart={(e) => {
                       e.dataTransfer.setData("text/lead-id", lead.id);

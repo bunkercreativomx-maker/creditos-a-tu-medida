@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { addLeadNote, sendAdvisorMessage, toggleBotActivo, updateLead } from "@/app/crm/actions";
+import { useRouter } from "next/navigation";
+import { addLeadNote, sendAdvisorMessage, toggleBotActivo, updateLead, deleteLead } from "@/app/crm/actions";
 import type { PbLead, Genero, EstadoCivil, TipoCredito } from "@/lib/types";
 
 /** Edición inline de los datos del lead (CURP, RFC, NSS, banco, CLABE, etc.). */
@@ -193,5 +194,64 @@ export function BotToggle({ conversationId, botActivo }: { conversationId: strin
     >
       Bot IA: {botActivo ? "activo" : "apagado"} — {botActivo ? "tomar control" : "reactivar bot"}
     </button>
+  );
+}
+
+/** Botón de borrado del lead. Solo el admin debería montarlo. */
+export function DeleteLeadButton({ leadId, leadName }: { leadId: string; leadName: string }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function handleDelete() {
+    setError(null);
+    startTransition(async () => {
+      try {
+        await deleteLead(leadId);
+        router.push("/crm");
+        router.refresh();
+      } catch (err) {
+        setError((err as Error)?.message ?? "Error al eliminar el lead");
+        setConfirming(false);
+      }
+    });
+  }
+
+  if (!confirming) {
+    return (
+      <button
+        disabled={isPending}
+        onClick={() => setConfirming(true)}
+        className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-100 disabled:opacity-50"
+      >
+        🗑 Eliminar lead
+      </button>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+      <p className="text-sm font-medium text-red-700">
+        ¿Eliminar a <span className="font-bold">{leadName}</span>? Se borrarán también sus operaciones, citas y notas. Esta acción no se puede deshacer.
+      </p>
+      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      <div className="mt-2 flex gap-2">
+        <button
+          disabled={isPending}
+          onClick={handleDelete}
+          className="rounded-lg bg-red-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+        >
+          {isPending ? "Borrando..." : "Sí, eliminar"}
+        </button>
+        <button
+          disabled={isPending}
+          onClick={() => setConfirming(false)}
+          className="rounded-lg bg-slate-200 px-4 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-300"
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
   );
 }

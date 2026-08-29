@@ -101,6 +101,42 @@ export async function sendAdvisorMessage(conversationId: string, telefono: strin
   await sendWhatsAppMessage(telefono, contenido);
 }
 
+export async function deleteLead(leadId: string) {
+  const pb = await createServerClient();
+  const user = pb.authStore.model as { id?: string; role?: string } | null;
+
+  // Regla de negocio: SOLO el admin puede borrar leads.
+  // Defensa en profundidad: no dependemos solo del deleteRule de la DB.
+  if (!user?.id || user.role !== "admin") {
+    throw new Error("No autorizado: solo un administrador puede eliminar leads");
+  }
+
+  // Borrar en cascada (relaciones required apuntan a este lead).
+  const [ops, citas, convs, notes] = await Promise.all([
+    pb.collection("operaciones").getFullList({ filter: `lead = "${leadId}"` }),
+    pb.collection("citas").getFullList({ filter: `lead = "${leadId}"` }),
+    pb.collection("conversations").getFullList({ filter: `lead = "${leadId}"` }),
+    pb.collection("lead_notes").getFullList({ filter: `lead = "${leadId}"` }),
+  ]);
+
+  for (const op of ops) await pb.collection("operaciones").delete(op.id);
+  for (const cita of citas) await pb.collection("citas").delete(cita.id);
+  for (const conv of convs) {
+    // borrar mensajes de la conversación
+    const msgs = await pb.collection("messages").getFullList({ filter: `conversation = "${conv.id}"` });
+    for (const m of msgs) await pb.collection("messages").delete(m.id);
+    await pb.collection("conversations").delete(conv.id);
+  }
+  for (const n of notes) await pb.collection("lead_notes").delete(n.id);
+
+  await pb.collection("leads").delete(leadId);
+  revalidatePath("/crm");
+  revalidatePath("/crm/financieras");
+  revalidatePath("/crm/calendario");
+  revalidatePath("/crm/vendedores");
+  revalidatePath("/crm/renovaciones");
+}
+
 export async function updateUserRole(profileId: string, role: UserRole) {
   const pb = await createServerClient();
   const user = pb.authStore.model;
