@@ -30,12 +30,15 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // ---- Reescribe la raíz del subdominio app hacia el CRM (URL limpia) ----
+  // ---- Enruta la raíz del subdominio app hacia el CRM ----
   if (isAppHost) {
     if (pathname === "/") {
+      // Redirect (no rewrite): el rewrite interno de / → /crm no re-ejecuta
+      // el middleware, así que la protección de auth se saltaría. Un redirect
+      // genera un nuevo request y el middleware corre de nuevo con normalidad.
       const url = request.nextUrl.clone();
       url.pathname = "/crm";
-      return NextResponse.rewrite(url);
+      return NextResponse.redirect(url);
     }
     // /login en app → /crm/login (para que la página del login cargue)
     if (pathname === "/login") {
