@@ -61,7 +61,7 @@ export function RenovacionesBoard({
   const proximos = conVencimiento.filter((x) => x.dias > UMBRAL_DIAS);
 
   return (
-    <div className="flex h-[calc(100vh-160px)] flex-col">
+    <div className="flex h-[calc(100dvh-170px)] flex-col">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-900 px-5 py-4 text-white shadow-lg">
         <div>
           <h1 className="text-lg font-bold tracking-tight">🔔 Créditos por renovar</h1>

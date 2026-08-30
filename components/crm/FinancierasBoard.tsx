@@ -58,7 +58,7 @@ export function FinancierasBoard({
   );
 
   return (
-    <div className="flex h-[calc(100vh-160px)] flex-col">
+    <div className="flex h-[calc(100dvh-170px)] flex-col">
       {/* Cabecera */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-900 px-5 py-4 text-white shadow-lg">
         <div>
@@ -79,8 +79,8 @@ export function FinancierasBoard({
         </div>
       </div>
 
-      {/* Tabla */}
-      <div className="flex-1 overflow-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+      {/* Tabla - desktop */}
+      <div className="hidden flex-1 overflow-auto rounded-xl border border-slate-200 bg-white shadow-sm md:block">
         <table className="w-full min-w-[1100px] text-sm">
           <thead className="sticky top-0 bg-slate-50 text-left text-xs uppercase text-slate-500">
             <tr>
@@ -117,6 +117,24 @@ export function FinancierasBoard({
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Cards - móvil */}
+      <div className="flex-1 space-y-3 overflow-auto rounded-xl border border-slate-200 bg-white p-3 shadow-sm md:hidden">
+        {filtered.length === 0 && (
+          <p className="py-10 text-center text-slate-400">Sin operaciones registradas</p>
+        )}
+        {filtered.map((op) => (
+          <MobileRow
+            key={op.id}
+            op={op}
+            leadName={leadName(op.lead)}
+            finName={finName(op.financiera)}
+            financieras={financieras}
+            onUpdate={(data) => startTransition(() => updateOperacion(op.id, data))}
+            onDelete={() => startTransition(() => deleteOperacion(op.id))}
+          />
+        ))}
       </div>
 
       {/* Agregar nueva operación */}
@@ -362,6 +380,121 @@ function AddForm({
       >
         Agregar
       </button>
+    </div>
+  );
+}
+
+/** Fila tipo card para móvil (oculta la tabla amplia en pantallas pequeñas). */
+function MobileRow({
+  op,
+  leadName,
+  finName,
+  financieras,
+  onUpdate,
+  onDelete,
+}: {
+  op: PbOperacion;
+  leadName: string;
+  finName: string;
+  financieras: PbFinanciera[];
+  onUpdate: (data: Record<string, unknown>) => void;
+  onDelete: () => void;
+}) {
+  const [monto, setMonto] = useState(op.monto_prestado ?? "");
+  const [comision, setComision] = useState(op.comision ?? "");
+  const [fechaVencimiento, setFechaVencimiento] = useState(toDateValue(op.fecha_vencimiento));
+
+  const statusColor =
+    op.status === "aprobado" || op.status === "finalizado"
+      ? "bg-emerald-100 text-emerald-700"
+      : op.status === "no_cumple"
+      ? "bg-rose-100 text-rose-700"
+      : op.status === "en_proceso"
+      ? "bg-amber-100 text-amber-700"
+      : "bg-slate-100 text-slate-600";
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-semibold text-slate-800">{leadName}</span>
+        <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${statusColor}`}>
+          {STATUS_OPTIONS.find((s) => s.value === op.status)?.label ?? op.status ?? "Pendiente"}
+        </span>
+      </div>
+      <div className="mt-1 flex items-center justify-between text-xs text-slate-500">
+        <span>{finName || "—"}</span>
+        <span className={op.tipo ? "rounded bg-slate-100 px-1.5 py-0.5 capitalize text-slate-600" : ""}>{op.tipo ?? ""}</span>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+        <label className="flex flex-col text-[11px] text-slate-400">
+          Monto
+          <input
+            type="number"
+            value={monto}
+            placeholder="$0"
+            onChange={(e) => setMonto(e.target.value)}
+            onBlur={() => monto !== op.monto_prestado && onUpdate({ monto_prestado: monto })}
+            className="mt-1 rounded-md border border-slate-200 px-2 py-1 text-sm"
+          />
+        </label>
+        <label className="flex flex-col text-[11px] text-slate-400">
+          Comisión
+          <input
+            type="number"
+            value={comision}
+            placeholder="$0"
+            onChange={(e) => setComision(e.target.value)}
+            onBlur={() => comision !== op.comision && onUpdate({ comision: comision })}
+            className="mt-1 rounded-md border border-slate-200 px-2 py-1 text-sm"
+          />
+        </label>
+        <label className="flex flex-col text-[11px] text-slate-400">
+          Vencimiento
+          <input
+            type="date"
+            value={fechaVencimiento}
+            onChange={(e) => setFechaVencimiento(e.target.value)}
+            onBlur={() => fechaVencimiento !== toDateValue(op.fecha_vencimiento) && onUpdate({ fecha_vencimiento: fechaVencimiento || null })}
+            className="mt-1 rounded-md border border-slate-200 px-2 py-1 text-sm"
+          />
+        </label>
+        <label className="flex flex-col text-[11px] text-slate-400">
+          Status
+          <select
+            value={op.status ?? "pendiente"}
+            onChange={(e) => onUpdate({ status: e.target.value })}
+            className="mt-1 rounded-md border border-slate-200 px-2 py-1 text-sm"
+          >
+            {STATUS_OPTIONS.map((s) => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </select>
+        </label>
+        <label className="col-span-2 flex flex-col text-[11px] text-slate-400">
+          Financiera
+          <select
+            value={op.financiera ?? ""}
+            onChange={(e) => onUpdate({ financiera: e.target.value || null })}
+            className="mt-1 rounded-md border border-slate-200 px-2 py-1 text-sm"
+          >
+            <option value="">—</option>
+            {financieras.map((f) => (
+              <option key={f.id} value={f.id}>{f.nombre}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="mt-2 flex items-center justify-between">
+        {op.comentarios && <p className="text-xs text-slate-500">{op.comentarios}</p>}
+        <button
+          onClick={onDelete}
+          className="ml-auto rounded-md px-2 py-1 text-xs text-rose-500 hover:bg-rose-50"
+        >
+          🗑️ Eliminar
+        </button>
+      </div>
     </div>
   );
 }

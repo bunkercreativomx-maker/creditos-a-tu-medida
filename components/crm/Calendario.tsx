@@ -58,16 +58,18 @@ export function Calendario({ citas, leads }: { citas: PbCita[]; leads: PbLead[] 
   const nextMonth = () => setCurrent(({year,month}) => month===11 ? {year:year+1,month:0} : {year,month:month+1});
 
   return (
-    <div className="flex h-[calc(100vh-160px)] flex-col">
-      <div className="mb-4 flex items-center justify-between rounded-xl bg-slate-900 px-5 py-4 text-white shadow-lg">
+    <div className="flex h-[calc(100dvh-170px)] flex-col">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-900 px-5 py-4 text-white shadow-lg">
         <div>
           <h1 className="text-lg font-bold tracking-tight">Calendario</h1>
           <p className="text-xs text-slate-400">{citas.length} citas agendadas</p>
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={prevMonth} className="rounded-lg bg-slate-700 px-3 py-1 text-sm hover:bg-slate-600">←</button>
-          <span className="text-sm font-semibold">{MONTHS[current.month]} {current.year}</span>
-          <button onClick={nextMonth} className="rounded-lg bg-slate-700 px-3 py-1 text-sm hover:bg-slate-600">→</button>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <button onClick={prevMonth} className="rounded-lg bg-slate-700 px-3 py-1 text-sm hover:bg-slate-600">←</button>
+            <span className="text-sm font-semibold">{MONTHS[current.month]} {current.year}</span>
+            <button onClick={nextMonth} className="rounded-lg bg-slate-700 px-3 py-1 text-sm hover:bg-slate-600">→</button>
+          </div>
           <button
             onClick={() => setShowAdd(true)}
             className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-semibold hover:bg-blue-500"
@@ -85,14 +87,14 @@ export function Calendario({ citas, leads }: { citas: PbCita[]; leads: PbLead[] 
         </div>
         <div className="grid grid-cols-7">
           {days.map((d, i) => {
-            if (!d) return <div key={`e${i}`} className="min-h-[110px] border-b border-r border-slate-100 bg-slate-50/40" />;
+            if (!d) return <div key={`e${i}`} className="min-h-[70px] border-b border-r border-slate-100 bg-slate-50/40 sm:min-h-[110px]" />;
             const c = citasDeFecha(d);
             const isToday = d.toDateString() === new Date().toDateString();
             return (
               <div
                 key={d.toISOString()}
                 onClick={() => setSelectedDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`)}
-                className={`min-h-[110px] cursor-pointer border-b border-r border-slate-100 p-1.5 transition-colors hover:bg-blue-50/40 ${isToday ? "bg-blue-50/60" : ""}`}
+                className={`min-h-[70px] cursor-pointer border-b border-r border-slate-100 p-1 transition-colors hover:bg-blue-50/40 sm:min-h-[110px] sm:p-1.5 ${isToday ? "bg-blue-50/60" : ""}`}
               >
                 <span className={`text-xs font-medium ${isToday ? "text-blue-700" : "text-slate-500"}`}>{d.getDate()}</span>
                 <div className="mt-1 space-y-1">

@@ -1,27 +1,25 @@
 import { createServerClient } from "@/lib/pocketbase-server";
-import { Pipeline } from "@/components/crm/Pipeline";
-import type { PbLead, PbUser } from "@/lib/types";
+import { Dashboard } from "@/components/crm/Dashboard";
+import type { PbLead, PbFinanciera, PbOperacion } from "@/lib/types";
 
 export default async function CrmDashboard() {
   const pb = await createServerClient();
-  const user = pb.authStore.model as { role?: string } | null;
-  const isAdmin = user?.role === "admin";
 
-  const [leadsResult, usersResult] = await Promise.all([
+  const [leadsResult, financierasResult, opsResult] = await Promise.all([
     pb.collection("leads").getList(1, 500, { sort: "-id" }),
-    pb.collection("users").getList(1, 500, { sort: "id" }),
+    pb.collection("financieras").getList(1, 200, { sort: "nombre" }),
+    pb.collection("operaciones").getList(1, 1000, { sort: "-id" }),
   ]);
 
   const leads = leadsResult.items as unknown as PbLead[];
-  const users = usersResult.items as unknown as PbUser[];
-
-  const vendedores = (users ?? [])
-    .filter((u) => u.role === "asesor")
-    .map((u) => ({ id: u.id, name: u.full_name || u.name || u.email || "" }));
+  const financieras = financierasResult.items as unknown as PbFinanciera[];
+  const operaciones = opsResult.items as unknown as PbOperacion[];
 
   return (
-    <div>
-      <Pipeline leads={leads ?? []} vendedores={vendedores} isAdmin={isAdmin} />
-    </div>
+    <Dashboard
+      operaciones={operaciones ?? []}
+      leads={leads ?? []}
+      financieras={financieras ?? []}
+    />
   );
 }

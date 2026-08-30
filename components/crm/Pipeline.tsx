@@ -34,7 +34,7 @@ export function Pipeline({ leads, vendedores, isAdmin }: { leads: PbLead[]; vend
   }
 
   return (
-    <div className="flex h-[calc(100vh-140px)] flex-col">
+    <div className="flex h-[calc(100dvh-150px)] flex-col">
       {/* Cabecera del pipeline estilo GHL */}
       <div className="mb-4 flex items-center justify-between rounded-xl bg-slate-900 px-5 py-4 text-white shadow-lg">
         <div>
@@ -69,7 +69,7 @@ export function Pipeline({ leads, vendedores, isAdmin }: { leads: PbLead[]; vend
               }}
               onDragLeave={() => setOverStage(null)}
               onDrop={(e) => handleDrop(e, stage.status)}
-              className={`flex w-72 shrink-0 flex-col rounded-xl border bg-slate-50/80 transition-all ${
+              className={`flex w-64 shrink-0 flex-col rounded-xl border bg-slate-50/80 transition-all sm:w-72 ${
                 overStage === stage.status
                   ? "border-blue-400 ring-2 ring-blue-300"
                   : "border-slate-200"

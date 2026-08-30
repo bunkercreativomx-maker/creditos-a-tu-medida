@@ -18,7 +18,7 @@ export function VendedoresBoard({ vendedores, leads }: { vendedores: PbUser[]; l
   const [isPending, startTransition] = useTransition();
 
   return (
-    <div className="flex h-[calc(100vh-160px)] flex-col">
+    <div className="flex h-[calc(100dvh-170px)] flex-col">
       <div className="mb-4 rounded-xl bg-slate-900 px-5 py-4 text-white shadow-lg">
         <h1 className="text-lg font-bold tracking-tight">Vendedores / Representantes</h1>
         <p className="text-xs text-slate-400">{vendedores.length} vendedores · {leads.length} leads</p>
