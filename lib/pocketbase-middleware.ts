@@ -3,34 +3,46 @@ import { type NextRequest, NextResponse } from "next/server";
 const APP_HOST = "app.creditoatumedida.com";
 
 /**
- * Middleware de sesión: protege /crm redirigiendo a /crm/login si no hay
- * cookie de auth de PocketBase (`pb_auth`). La validación real del token
- * ocurre en los Server Components / Server Actions vía createServerClient.
+ * Middleware de sesión + enrutado por subdominio.
  *
- * Además, en el subdominio `app.creditoatumedida.com` reescribe la raíz `/`
- * hacia `/crm` para que el CRM se sirva en la URL limpia sin el prefijo.
+ * En el subdominio `app.creditoatumedida.com` el CRM se sirve en la raíz con
+ * URL limpia (sin `/crm`): la raíz `/` y cualquier ruta que no empiece por
+ * `/crm` se reescriben internamente hacia `/crm...`.
+ *
+ * En AMBOS hosts se protege el CRM: sin cookie `pb_auth` válida se redirige
+ * al login (la validación real del token ocurre en los Server Components).
  */
 export async function updateSession(request: NextRequest) {
   const { host, pathname } = request.nextUrl;
   const isAppHost = host === APP_HOST || host.startsWith(`${APP_HOST}:`);
 
-  // En el subdominio app: la raíz y cualquier ruta no-"/crm" se sirven
-  // reescribiendo hacia /crm (URL limpia, sin redirect).
-  if (isAppHost && pathname !== "/crm" && !pathname.startsWith("/crm/")) {
-    const url = request.nextUrl.clone();
-    url.pathname = pathname === "/" ? "/crm" : `/crm${pathname}`;
-    return NextResponse.rewrite(url);
-  }
-
   const authCookie = request.cookies.get("pb_auth")?.value;
-  const isCrmPath = pathname.startsWith("/crm");
-  const isLogin = pathname === "/crm/login";
+  const authed = Boolean(authCookie);
 
-  if (isCrmPath && !isLogin && !authCookie) {
+  const isCrmPath = pathname === "/crm" || pathname.startsWith("/crm/");
+  const isLoginPath = pathname === "/crm/login" || (isAppHost && pathname === "/login");
+
+  // ---- Protección de autenticación (aplica a ambos hosts) ----
+  // Cualquier ruta del CRM que no sea el login exige sesión.
+  if (isCrmPath && !isLoginPath && !authed) {
     const url = request.nextUrl.clone();
-    // En el subdominio app, ir al login limpio (el rewrite lo mapea a /crm/login)
     url.pathname = isAppHost ? "/login" : "/crm/login";
     return NextResponse.redirect(url);
+  }
+
+  // ---- Reescribe la raíz del subdominio app hacia el CRM (URL limpia) ----
+  if (isAppHost) {
+    if (pathname === "/") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/crm";
+      return NextResponse.rewrite(url);
+    }
+    // /login en app → /crm/login (para que la página del login cargue)
+    if (pathname === "/login") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/crm/login";
+      return NextResponse.rewrite(url);
+    }
   }
 
   return NextResponse.next({ request });
