@@ -35,7 +35,10 @@ export async function updateSession(request: NextRequest) {
     if (pathname === "/") {
       const url = request.nextUrl.clone();
       url.pathname = "/crm";
-      return NextResponse.rewrite(url);
+      const res = NextResponse.redirect(url);
+      res.headers.set("x-debug-host", host);
+      res.headers.set("x-debug-ishost", String(isAppHost));
+      return res;
     }
     // /login en app → /crm/login (para que la página del login cargue)
     if (pathname === "/login") {
