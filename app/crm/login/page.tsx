@@ -28,7 +28,9 @@ export default function LoginPage() {
     }
 
     setLoading(false);
-    router.push("/crm");
+    // En el subdominio app, ir a la raíz (el rewrite la mapea al CRM sin /crm)
+    const isApp = typeof window !== "undefined" && window.location.host === "app.creditoatumedida.com";
+    router.push(isApp ? "/" : "/crm");
     router.refresh();
   }
 
