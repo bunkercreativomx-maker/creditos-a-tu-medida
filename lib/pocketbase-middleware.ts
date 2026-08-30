@@ -5,9 +5,9 @@ const APP_HOST = "app.creditoatumedida.com";
 /**
  * Middleware de sesión + enrutado por subdominio.
  *
- * En el subdominio `app.creditoatumedida.com` el CRM se sirve en la raíz con
- * URL limpia (sin `/crm`): la raíz `/` y cualquier ruta que no empiece por
- * `/crm` se reescriben internamente hacia `/crm...`.
+ * En el subdominio `app.creditoatumedida.com` el CRM se sirve desde la raíz:
+ * al entrar a `/` se redirige a `/crm` (y `/login` se mapea a `/crm/login`),
+ * de modo que el subdominio app solo expone el CRM (nunca la landing pública).
  *
  * En AMBOS hosts se protege el CRM: sin cookie `pb_auth` válida se redirige
  * al login (la validación real del token ocurre en los Server Components).
