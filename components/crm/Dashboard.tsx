@@ -157,27 +157,24 @@ export function Dashboard({
   const hoyKey = keyFecha(hoy);
 
   const recordatorios = useMemo(() => {
-    const usuario = usuarios.find((u) => u.id === currentUserId);
-    const esAdmin = usuario?.role === "admin";
     return citas
-      .filter((c) => {
-        // El vendedor ve SUS citas; el admin ve todas.
-        if (esAdmin) return true;
-        return c.asignado_a === currentUserId || !c.asignado_a;
-      })
       .map((c) => {
         const f = new Date(c.fecha);
         const hora = isNaN(f.getTime()) ? "" : f.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+        const asesor = c.asignado_a ? usuarios.find((u) => u.id === c.asignado_a) ?? null : null;
         return {
           cita: c,
           fechaKey: keyFecha(f),
           hora,
           lead: leads.find((l) => l.id === c.lead) ?? null,
+          asesorNombre: asesor
+            ? (asesor.full_name || asesor.name || asesor.email || "Sin asignar")
+            : "Sin asignar",
         };
       })
       .filter((x) => x.fechaKey >= hoyKey)
       .sort((a, b) => a.fechaKey.localeCompare(b.fechaKey) || a.hora.localeCompare(b.hora));
-  }, [citas, leads, usuarios, currentUserId, hoyKey]);
+  }, [citas, leads, usuarios, hoyKey]);
 
   const citasHoy = recordatorios.filter((x) => x.fechaKey === hoyKey);
   const citasProximas = recordatorios.filter((x) => x.fechaKey !== hoyKey).slice(0, 5);
@@ -342,7 +339,7 @@ export function Dashboard({
             {/* Citas de hoy */}
             {citasHoy.length > 0 ? (
               <div className="divide-y divide-slate-100">
-                {citasHoy.map(({ cita, hora, lead }) => (
+                {citasHoy.map(({ cita, hora, lead, asesorNombre }) => (
                   <div key={cita.id} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 hover:bg-slate-50/60">
                     <div className="flex items-center gap-3">
                       <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${CITA_TIPO_COLOR[cita.tipo ?? "llamada"]}`}>
@@ -352,9 +349,14 @@ export function Dashboard({
                         <p className="text-sm font-semibold text-slate-800">
                           {nombreLead(cita.lead) ?? cita.titulo ?? "Sin asunto"}
                         </p>
-                        {cita.titulo && nombreLead(cita.lead) && (
-                          <p className="text-xs text-slate-400">{cita.titulo}</p>
-                        )}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {cita.titulo && nombreLead(cita.lead) && (
+                            <span className="text-xs text-slate-400">{cita.titulo}</span>
+                          )}
+                          <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                            👤 {asesorNombre}
+                          </span>
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-3 text-sm">
@@ -384,7 +386,7 @@ export function Dashboard({
               <div className="border-t border-slate-100 bg-slate-50/50 px-5 py-3">
                 <p className="mb-2 text-xs font-semibold uppercase text-slate-500">Próximas citas</p>
                 <div className="flex flex-wrap gap-2">
-                  {citasProximas.map(({ cita, fechaKey, hora }) => (
+                  {citasProximas.map(({ cita, fechaKey, hora, asesorNombre }) => (
                     <span
                       key={cita.id}
                       className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600"
@@ -393,6 +395,9 @@ export function Dashboard({
                         {CITA_TIPO_LABEL[cita.tipo ?? "llamada"]}
                       </span>
                       <span className="font-medium text-slate-800">{nombreLead(cita.lead) ?? cita.titulo ?? "Cita"}</span>
+                      <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
+                        👤 {asesorNombre}
+                      </span>
                       <span className="capitalize text-slate-400">{fmtCitaFecha(fechaKey)}</span>
                       {hora && <span className="text-blue-700">{hora}</span>}
                     </span>
