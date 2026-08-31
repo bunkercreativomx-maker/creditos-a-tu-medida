@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import type { PbOperacion, PbLead, PbFinanciera, OperacionStatus } from "@/lib/types";
+import type { PbOperacion, PbLead, PbFinanciera, OperacionStatus, PbCita, PbUser } from "@/lib/types";
 
 const ACTIVE_STATUS: OperacionStatus[] = ["aprobado", "en_proceso", "pendiente"];
 
@@ -33,14 +33,34 @@ const MONTH_NAMES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
+const CITA_TIPO_LABEL: Record<string, string> = {
+  llamada: "📞 Llamada",
+  cita: "🤝 Cita",
+  seguimiento: "🔁 Seguimiento",
+  documentos: "📄 Documentos",
+};
+
+const CITA_TIPO_COLOR: Record<string, string> = {
+  llamada: "bg-sky-100 text-sky-700",
+  cita: "bg-violet-100 text-violet-700",
+  seguimiento: "bg-amber-100 text-amber-700",
+  documentos: "bg-emerald-100 text-emerald-700",
+};
+
 export function Dashboard({
   operaciones,
   leads,
   financieras,
+  citas,
+  usuarios,
+  currentUserId,
 }: {
   operaciones: PbOperacion[];
   leads: PbLead[];
   financieras: PbFinanciera[];
+  citas: PbCita[];
+  usuarios: PbUser[];
+  currentUserId: string;
 }) {
   const hoy = new Date();
   const [reporteOpen, setReporteOpen] = useState(false);
@@ -130,6 +150,48 @@ export function Dashboard({
     const comision = aprobadas.reduce((s, o) => s + (Number(o.comision) || 0), 0);
     return { aprobadas, total, comision };
   }, [operaciones, mesActual, anioActual]);
+
+  // ===== Recordatorios del calendario =====
+  // Cita "de hoy" si su fecha (día) coincide con hoy.
+  const keyFecha = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const hoyKey = keyFecha(hoy);
+
+  const recordatorios = useMemo(() => {
+    const usuario = usuarios.find((u) => u.id === currentUserId);
+    const esAdmin = usuario?.role === "admin";
+    return citas
+      .filter((c) => {
+        // El vendedor ve SUS citas; el admin ve todas.
+        if (esAdmin) return true;
+        return c.asignado_a === currentUserId || !c.asignado_a;
+      })
+      .map((c) => {
+        const f = new Date(c.fecha);
+        const hora = isNaN(f.getTime()) ? "" : f.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+        return {
+          cita: c,
+          fechaKey: keyFecha(f),
+          hora,
+          lead: leads.find((l) => l.id === c.lead) ?? null,
+        };
+      })
+      .filter((x) => x.fechaKey >= hoyKey)
+      .sort((a, b) => a.fechaKey.localeCompare(b.fechaKey) || a.hora.localeCompare(b.hora));
+  }, [citas, leads, usuarios, currentUserId, hoyKey]);
+
+  const citasHoy = recordatorios.filter((x) => x.fechaKey === hoyKey);
+  const citasProximas = recordatorios.filter((x) => x.fechaKey !== hoyKey).slice(0, 5);
+
+  const nombreLead = (id: string | null) => {
+    if (!id) return null;
+    const l = leads.find((x) => x.id === id);
+    return l ? `${l.nombre || "Sin nombre"} ${l.apellido ?? ""}`.trim() : null;
+  };
+  const telLead = (id: string | null) => leads.find((x) => x.id === id)?.telefono ?? "";
+  const fmtCitaFecha = (fechaKey: string) => {
+    const [y, m, d] = fechaKey.split("-").map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" });
+  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -254,6 +316,92 @@ export function Dashboard({
         <div className="mt-4">
           <BarChart serie={serie} max={maxSerie} />
         </div>
+      </div>
+
+      {/* RECORDATORIOS del calendario */}
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-5 py-3">
+          <div>
+            <h2 className="font-semibold text-blue-900">📅 Recordatorios de hoy</h2>
+            <p className="text-xs text-slate-400">
+              Tus citas y actividades del día ·{" "}
+              {hoy.toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" })}
+            </p>
+          </div>
+          <Link href="/crm/calendario" className="text-xs font-semibold text-blue-700 hover:underline">
+            Abrir calendario →
+          </Link>
+        </div>
+
+        {citasHoy.length === 0 && citasProximas.length === 0 ? (
+          <div className="px-5 py-6 text-center text-sm text-slate-500">
+            🎉 No tienes citas agendadas. Puedes agregarlas desde el calendario.
+          </div>
+        ) : (
+          <div>
+            {/* Citas de hoy */}
+            {citasHoy.length > 0 ? (
+              <div className="divide-y divide-slate-100">
+                {citasHoy.map(({ cita, hora, lead }) => (
+                  <div key={cita.id} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 hover:bg-slate-50/60">
+                    <div className="flex items-center gap-3">
+                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${CITA_TIPO_COLOR[cita.tipo ?? "llamada"]}`}>
+                        {CITA_TIPO_LABEL[cita.tipo ?? "llamada"]}
+                      </span>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-800">
+                          {nombreLead(cita.lead) ?? cita.titulo ?? "Sin asunto"}
+                        </p>
+                        {cita.titulo && nombreLead(cita.lead) && (
+                          <p className="text-xs text-slate-400">{cita.titulo}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm">
+                      {telLead(cita.lead) && (
+                        <a
+                          href={`https://wa.me/52${telLead(cita.lead).replace(/\D/g, "")}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hidden items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 sm:flex"
+                        >
+                          💬 WhatsApp
+                        </a>
+                      )}
+                      <span className="font-bold text-blue-700">{hora || "—"}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="border-b border-slate-100 px-5 py-3 text-sm text-slate-400">
+                Sin citas para hoy.
+              </div>
+            )}
+
+            {/* Próximas */}
+            {citasProximas.length > 0 && (
+              <div className="border-t border-slate-100 bg-slate-50/50 px-5 py-3">
+                <p className="mb-2 text-xs font-semibold uppercase text-slate-500">Próximas citas</p>
+                <div className="flex flex-wrap gap-2">
+                  {citasProximas.map(({ cita, fechaKey, hora }) => (
+                    <span
+                      key={cita.id}
+                      className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600"
+                    >
+                      <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${CITA_TIPO_COLOR[cita.tipo ?? "llamada"]}`}>
+                        {CITA_TIPO_LABEL[cita.tipo ?? "llamada"]}
+                      </span>
+                      <span className="font-medium text-slate-800">{nombreLead(cita.lead) ?? cita.titulo ?? "Cita"}</span>
+                      <span className="capitalize text-slate-400">{fmtCitaFecha(fechaKey)}</span>
+                      {hora && <span className="text-blue-700">{hora}</span>}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Reporte mensual modal */}
