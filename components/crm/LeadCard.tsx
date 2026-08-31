@@ -12,12 +12,14 @@ export function LeadCard({
   onDragEnd,
   isDragging,
   isAdmin,
+  asignadoNombre,
 }: {
   lead: PbLead;
   onDragStart: (e: React.DragEvent) => void;
   onDragEnd: () => void;
   isDragging: boolean;
   isAdmin?: boolean;
+  asignadoNombre?: string | null;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -28,6 +30,7 @@ export function LeadCard({
   const nombre = `${lead.nombre || "Sin nombre"} ${lead.apellido ?? ""}`.trim();
   const origen = lead.origen === "whatsapp" ? "WhatsApp" : "Web";
   const asignado = lead.asignado_a ? true : false;
+  const duenoNombre = asignadoNombre || "Asignado";
 
   function handleClaim() {
     startTransition(async () => {
@@ -97,11 +100,20 @@ export function LeadCard({
 
       <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2">
         <span
-          className={`text-[10px] font-medium ${
+          className={`inline-flex items-center gap-1 text-[10px] font-medium ${
             asignado || justClaimed ? "text-emerald-600" : "text-slate-400"
           }`}
         >
-          {asignado || justClaimed ? "✓ Asignado a ti" : "Sin asignar"}
+          {asignado || justClaimed ? (
+            <>
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-100 text-[9px]">
+                👤
+              </span>
+              {justClaimed ? "Asignado a ti" : duenoNombre}
+            </>
+          ) : (
+            "Sin asignar"
+          )}
         </span>
         <div className="flex items-center gap-1.5">
           {!asignado && (

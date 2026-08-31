@@ -17,6 +17,15 @@ export function Pipeline({ leads, vendedores, isAdmin }: { leads: PbLead[]; vend
     [leads]
   );
 
+  const asignadoNombre = useCallback(
+    (id: string | null) => {
+      if (!id) return null;
+      const v = vendedores?.find((x) => x.id === id);
+      return v?.name ?? null;
+    },
+    [vendedores]
+  );
+
   const total = leads.length;
 
   function handleDrop(e: React.DragEvent, targetStatus: LeadStatus) {
@@ -96,6 +105,7 @@ export function Pipeline({ leads, vendedores, isAdmin }: { leads: PbLead[]; vend
                     key={lead.id}
                     lead={lead}
                     isAdmin={isAdmin}
+                    asignadoNombre={asignadoNombre(lead.asignado_a)}
                     isDragging={draggingId === lead.id}
                     onDragStart={(e) => {
                       e.dataTransfer.setData("text/lead-id", lead.id);

@@ -15,9 +15,10 @@ export default async function CrmPipelinePage() {
   const leads = leadsResult.items as unknown as PbLead[];
   const users = usersResult.items as unknown as PbUser[];
 
-  const vendedores = (users ?? [])
-    .filter((u) => u.role === "asesor")
-    .map((u) => ({ id: u.id, name: u.full_name || u.name || u.email || "" }));
+  const vendedores = (users ?? []).map((u) => ({
+    id: u.id,
+    name: u.full_name || u.name || u.email || "",
+  }));
 
   return (
     <div>
