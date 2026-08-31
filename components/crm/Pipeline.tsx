@@ -55,14 +55,12 @@ export function Pipeline({ leads, vendedores, isAdmin }: { leads: PbLead[]; vend
           <span className="rounded-full bg-slate-700 px-3 py-1">
             <span className="font-bold text-white">{total}</span> total
           </span>
-          <span className="rounded-full bg-slate-700/60 px-3 py-1">
-            Desliza para ver todas las etapas →
-          </span>
         </div>
       </div>
 
       {/* Columnas del pipeline */}
-      <div className="flex flex-1 gap-3 overflow-x-auto pb-4">
+      {/* En móvil se apilan verticalmente; en md+ quedan como kanban con scroll horizontal */}
+      <div className="flex flex-1 flex-col gap-3 overflow-y-auto pb-4 md:flex-row md:overflow-x-auto md:overflow-y-hidden">
         {PIPELINE_STAGES.map((stage) => {
           const stageLeads = byStatus(stage.status);
           return (
@@ -74,7 +72,7 @@ export function Pipeline({ leads, vendedores, isAdmin }: { leads: PbLead[]; vend
               }}
               onDragLeave={() => setOverStage(null)}
               onDrop={(e) => handleDrop(e, stage.status)}
-              className={`flex w-64 shrink-0 flex-col rounded-xl border bg-slate-50/80 transition-all sm:w-72 ${
+              className={`flex w-full shrink-0 flex-col rounded-xl border bg-slate-50/80 transition-all md:w-72 ${
                 overStage === stage.status
                   ? "border-blue-400 ring-2 ring-blue-300"
                   : "border-slate-200"
@@ -92,7 +90,7 @@ export function Pipeline({ leads, vendedores, isAdmin }: { leads: PbLead[]; vend
               </div>
 
               {/* Tarjetas */}
-              <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-2">
+              <div className="flex flex-1 flex-col gap-2 p-2 md:overflow-y-auto">
                 {stageLeads.map((lead) => (
                   <LeadCard
                     key={lead.id}
