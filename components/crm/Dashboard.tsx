@@ -179,6 +179,16 @@ export function Dashboard({
   const citasHoy = recordatorios.filter((x) => x.fechaKey === hoyKey);
   const citasProximas = recordatorios.filter((x) => x.fechaKey !== hoyKey).slice(0, 5);
 
+  // ===== Documentos por vencer =====
+  const documentosPorVencer = useMemo(() => {
+    return leads
+      .filter((l) => l.vencimiento_documentos)
+      .map((l) => ({ l, dias: diasRestantes(l.vencimiento_documentos) ?? 9999 }))
+      .filter((x) => x.dias <= 60)
+      .sort((a, b) => a.dias - b.dias)
+      .slice(0, 10);
+  }, [leads]);
+
   const nombreLead = (id: string | null) => {
     if (!id) return null;
     const l = leads.find((x) => x.id === id);
@@ -298,6 +308,47 @@ export function Dashboard({
           </div>
         )}
       </div>
+
+      {/* Documentos por vencer */}
+      {documentosPorVencer.length > 0 && (
+        <div className="overflow-hidden rounded-xl border border-orange-200 bg-orange-50/60 shadow-sm">
+          <div className="flex items-center justify-between gap-2 border-b border-orange-200 px-5 py-3">
+            <div>
+              <h2 className="font-semibold text-orange-800">🪪 Documentos por vencer</h2>
+              <p className="text-xs text-orange-700">
+                Clientes con INE/comprobante que vencen en los próximos 60 días
+              </p>
+            </div>
+            <span className="rounded-full bg-orange-500 px-3 py-1 text-sm font-bold text-white">
+              {documentosPorVencer.length}
+            </span>
+          </div>
+          <div className="divide-y divide-orange-100">
+            {documentosPorVencer.map(({ l, dias }) => {
+              const lNombre = `${l.nombre || "Sin nombre"} ${l.apellido ?? ""}`.trim();
+              return (
+                <div key={l.id} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 hover:bg-white/60">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-full bg-orange-100 text-orange-700">
+                      <span className="text-sm font-bold leading-none">{dias}</span>
+                      <span className="text-[8px] uppercase leading-tight">días</span>
+                    </div>
+                    <div>
+                      <Link href={`/crm/leads/${l.id}`} className="font-semibold text-slate-800 hover:text-blue-700">
+                        {lNombre}
+                      </Link>
+                      <p className="text-xs text-slate-500">
+                        Vence {fmtFecha(l.vencimiento_documentos)}
+                      </p>
+                      {l.telefono && <p className="text-xs text-slate-400">📞 {l.telefono}</p>}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* GRÁFICA mensual de préstamos aprobados */}
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -561,6 +612,31 @@ function ReporteModal({
         </div>
 
         <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
+          <button
+            onClick={() => {
+              const header = "Fecha;Cliente;Financiera;Monto;Comision";
+              const rows = data.aprobadas.map((op) =>
+                [
+                  fmtFecha(op.fecha_desembolso || op.created),
+                  leadName(op.lead),
+                  finName(op.financiera),
+                  fmtMonto(op.monto_prestado),
+                  fmtMonto(op.comision),
+                ].join(";")
+              );
+              const csv = [header, ...rows].join("\n");
+              const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `reporte_${MONTH_NAMES[mes]}_${anio}.csv`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            ⬇️ Exportar CSV
+          </button>
           <button onClick={() => window.print()} className="rounded-lg bg-blue-900 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800">
             🖨️ Imprimir / PDF
           </button>

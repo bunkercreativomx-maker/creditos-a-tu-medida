@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyZernioSignature, sendWhatsAppMessage, type ZernioInboundEvent } from "@/lib/zernio";
 import { runBotTurn } from "@/lib/bot";
 import { createAdminClient } from "@/lib/pocketbase-admin";
+import { notifyNewLeadToSlack } from "@/lib/slack-notify";
 
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
@@ -41,6 +42,7 @@ export async function POST(req: NextRequest) {
     .catch(() => null);
 
   let leadId: string;
+  let esLeadNuevo = false;
   if (existingLead) {
     leadId = existingLead.id;
   } else {
@@ -51,6 +53,7 @@ export async function POST(req: NextRequest) {
       status: "nuevo",
     });
     leadId = newLead.id;
+    esLeadNuevo = true;
   }
 
   // Upsert conversation por teléfono
@@ -120,6 +123,16 @@ export async function POST(req: NextRequest) {
 
   // Marcar como procesado SOLO después de éxito (evita perder reintentos)
   await pb.collection("processed_webhook_events").create({ event_id: event.id });
+
+  // Notificar lead nuevo (best-effort)
+  if (esLeadNuevo) {
+    await notifyNewLeadToSlack({
+      nombre: event.data.contact_name ?? null,
+      telefono,
+      origen: "whatsapp",
+      leadId,
+    });
+  }
 
   return NextResponse.json({ ok: true });
 }

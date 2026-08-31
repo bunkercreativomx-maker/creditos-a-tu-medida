@@ -53,6 +53,7 @@ export type PbLead = {
   origen: LeadOrigen;
   status: LeadStatus;
   asignado_a: string | null;
+  vencimiento_documentos: string | null;
   // Campos file (documentos) — guardan el nombre del archivo en PB
   ine_frente: string | null;
   ine_reverso: string | null;
@@ -90,6 +91,17 @@ export type PbLeadNote = {
   lead: string;
   autor: string | null;
   nota: string;
+  created: string;
+  updated: string;
+};
+
+/** Registro de la colección `lead_audit` (historial del lead). */
+export type PbLeadAudit = {
+  id: string;
+  lead: string;
+  actor: string | null;
+  accion: string;
+  detalle: string | null;
   created: string;
   updated: string;
 };

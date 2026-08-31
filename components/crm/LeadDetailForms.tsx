@@ -27,6 +27,7 @@ export function LeadDataEditor({ lead }: { lead: PbLead }) {
     lugar_nacimiento: lead.lugar_nacimiento ?? "",
     genero: lead.genero ?? "",
     estado_civil: lead.estado_civil ?? "",
+    vencimiento_documentos: lead.vencimiento_documentos ?? "",
   }));
 
   function set(k: keyof typeof form, v: string) {
@@ -65,6 +66,7 @@ export function LeadDataEditor({ lead }: { lead: PbLead }) {
         </select>
       } />
       <Field label="Fecha de nacimiento" input={<input className={inputCls} value={form.fecha_nacimiento} onChange={(e) => set("fecha_nacimiento", e.target.value)} placeholder="YYYY-MM-DD" />} />
+      <Field label="Vencimiento de documentos" input={<input className={inputCls} type="date" value={form.vencimiento_documentos?.slice(0, 10)} onChange={(e) => set("vencimiento_documentos", e.target.value)} />} />
       <Field label="Lugar de nacimiento" input={<input className={inputCls} value={form.lugar_nacimiento} onChange={(e) => set("lugar_nacimiento", e.target.value)} />} />
       <Field label="Género" input={
         <select className={inputCls} value={form.genero} onChange={(e) => set("genero", e.target.value)}>

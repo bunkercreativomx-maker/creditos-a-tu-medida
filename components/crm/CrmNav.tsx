@@ -9,12 +9,13 @@ const TABS = [
   { href: "/crm", label: "Dashboard", icon: "📊" },
   { href: "/crm/pipeline", label: "Pipeline", icon: "🗂️" },
   { href: "/crm/financieras", label: "Financieras", icon: "🏦" },
+  { href: "/crm/comisiones", label: "Comisiones", icon: "💰" },
   { href: "/crm/renovaciones", label: "Renovaciones", icon: "🔔" },
   { href: "/crm/calendario", label: "Calendario", icon: "📅" },
   { href: "/crm/vendedores", label: "Vendedores", icon: "👥" },
 ];
 
-export function CrmNav({ fullName, role }: { fullName: string; role: string }) {
+export function CrmNav({ fullName, role, leadsNuevosHoy }: { fullName: string; role: string; leadsNuevosHoy?: number }) {
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -110,6 +111,22 @@ export function CrmNav({ fullName, role }: { fullName: string; role: string }) {
               </span>
             </div>
           </nav>
+        )}
+
+        {/* Aviso de leads nuevos */}
+        {typeof leadsNuevosHoy === "number" && leadsNuevosHoy > 0 && (
+          <Link
+            href="/crm/pipeline"
+            onClick={() => setMenuOpen(false)}
+            className="mb-2 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 transition-colors hover:bg-emerald-100"
+          >
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+            </span>
+            <span className="font-semibold">🆕 {leadsNuevosHoy} {leadsNuevosHoy === 1 ? "lead nuevo" : "leads nuevos"} hoy</span>
+            <span className="ml-auto text-xs text-emerald-600">Ver pipeline →</span>
+          </Link>
         )}
       </div>
     </header>

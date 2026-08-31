@@ -11,10 +11,20 @@ export function Pipeline({ leads, vendedores, isAdmin }: { leads: PbLead[]; vend
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overStage, setOverStage] = useState<LeadStatus | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [busqueda, setBusqueda] = useState("");
 
   const byStatus = useCallback(
-    (status: LeadStatus) => leads.filter((l) => l.status === status),
-    [leads]
+    (status: LeadStatus) =>
+      leads
+        .filter((l) => l.status === status)
+        .filter((l) => {
+          if (!busqueda.trim()) return true;
+          const q = busqueda.trim().toLowerCase();
+          const nombre = `${l.nombre ?? ""} ${l.apellido ?? ""}`.toLowerCase();
+          const tel = (l.telefono ?? "").toLowerCase();
+          return nombre.includes(q) || tel.includes(q);
+        }),
+    [leads, busqueda]
   );
 
   const asignadoNombre = useCallback(
@@ -59,11 +69,59 @@ export function Pipeline({ leads, vendedores, isAdmin }: { leads: PbLead[]; vend
           >
             + Nuevo lead
           </button>
+          <button
+            onClick={() => {
+              const header = "Nombre;Telefono;Origen;Etapa;Asignado a;Monto";
+              const rows = leads
+                .filter((l) => {
+                  if (!busqueda.trim()) return true;
+                  const q = busqueda.trim().toLowerCase();
+                  const nombre = `${l.nombre ?? ""} ${l.apellido ?? ""}`.toLowerCase();
+                  const tel = (l.telefono ?? "").toLowerCase();
+                  return nombre.includes(q) || tel.includes(q);
+                })
+                .map((l) =>
+                  [
+                    `${l.nombre ?? ""} ${l.apellido ?? ""}`.trim(),
+                    l.telefono,
+                    l.origen === "whatsapp" ? "WhatsApp" : "Web",
+                    l.status,
+                    asignadoNombre(l.asignado_a) ?? "",
+                    l.monto_aproximado ?? "",
+                  ].join(";")
+                );
+              const csv = [header, ...rows].join("\n");
+              const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `leads_${new Date().toISOString().slice(0, 10)}.csv`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+            className="shrink-0 rounded-full border border-slate-600 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-700"
+          >
+            ⬇️ CSV
+          </button>
         </div>
-        <div className="mt-3 flex items-center gap-2 text-xs text-slate-300">
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-300">
           <span className="rounded-full bg-slate-700 px-3 py-1">
             <span className="font-bold text-white">{total}</span> total
           </span>
+          <div className="relative min-w-[180px] flex-1 sm:max-w-xs">
+            <svg
+              className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500"
+              viewBox="0 0 20 20" fill="currentColor"
+            >
+              <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+            </svg>
+            <input
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar por nombre o teléfono..."
+              className="w-full rounded-full border border-slate-700 bg-slate-800 py-1.5 pl-8 pr-3 text-xs text-white placeholder:text-slate-400 focus:border-blue-400 focus:outline-none"
+            />
+          </div>
         </div>
       </div>
 

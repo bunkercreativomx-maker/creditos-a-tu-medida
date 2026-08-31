@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { createServerClient } from "@/lib/pocketbase-server";
 import { PB_URL } from "@/lib/pocketbase";
 import { NoteForm, AdvisorMessageForm, BotToggle, LeadDataEditor, DeleteLeadButton } from "@/components/crm/LeadDetailForms";
-import type { PbLead, PbConversation, PbMessage, PbLeadNote } from "@/lib/types";
+import type { PbLead, PbConversation, PbMessage, PbLeadNote, PbLeadAudit, PbUser } from "@/lib/types";
 
 const DOCUMENTS: { key: keyof PbLead; label: string }[] = [
   { key: "ine_frente", label: "INE (frente)" },
@@ -50,7 +50,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     return notFound();
   }
 
-  const [notesResult, conversationResult, documentLinks] = await Promise.all([
+  const [notesResult, conversationResult, documentLinks, auditResult, usersResult] = await Promise.all([
     pb
       .collection("lead_notes")
       .getList(1, 200, { filter: `lead = "${id}"`, sort: "-id" }),
@@ -59,10 +59,23 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       .getFirstListItem(`lead = "${id}"`)
       .catch(() => null),
     getDocumentLinks(lead),
+    pb
+      .collection("lead_audit")
+      .getList(1, 200, { filter: `lead = "${id}"`, sort: "-created" })
+      .catch(() => ({ items: [] })),
+    pb.collection("users").getList(1, 500, { sort: "id" }),
   ]);
 
   const notes = notesResult.items as unknown as PbLeadNote[];
   const conversation = conversationResult as unknown as PbConversation | null;
+  const auditLogs = (auditResult as { items: unknown[] }).items as unknown as PbLeadAudit[];
+  const usuarios = (usersResult as { items: unknown[] }).items as unknown as PbUser[];
+
+  const nombreActor = (id: string | null) => {
+    if (!id) return "Sistema";
+    const u = usuarios.find((x) => x.id === id);
+    return u ? (u.full_name || u.name || u.email || "Usuario") : "Usuario";
+  };
 
   let messages: PbMessage[] = [];
   if (conversation) {
@@ -182,6 +195,34 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             </li>
           ))}
           {(!notes || notes.length === 0) && <p className="text-sm text-slate-400">Sin notas todavía.</p>}
+        </ul>
+      </div>
+
+      <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="font-semibold text-blue-900">🕓 Historial del lead</h2>
+        <p className="mt-0.5 text-xs text-slate-400">
+          Registro de quién creó, tomó y editó este lead.
+        </p>
+        <ul className="mt-4 space-y-3">
+          {(auditLogs ?? []).map((a) => (
+            <li key={a.id} className="flex items-start gap-3">
+              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px]">
+                {a.accion === "Lead creado" ? "➕" : a.accion === "Lead tomado" ? "👤" : "✏️"}
+              </span>
+              <div>
+                <p className="text-sm text-slate-700">
+                  <span className="font-semibold">{a.accion}</span>
+                  {a.detalle && <span className="text-slate-500"> · {a.detalle}</span>}
+                </p>
+                <p className="text-xs text-slate-400">
+                  {nombreActor(a.actor)} · {new Date(a.created).toLocaleString("es-MX")}
+                </p>
+              </div>
+            </li>
+          ))}
+          {(!auditLogs || auditLogs.length === 0) && (
+            <p className="text-sm text-slate-400">Sin actividad registrada todavía.</p>
+          )}
         </ul>
       </div>
     </div>

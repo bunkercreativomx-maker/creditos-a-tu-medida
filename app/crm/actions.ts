@@ -4,10 +4,32 @@ import { revalidatePath } from "next/cache";
 import { createServerClient } from "@/lib/pocketbase-server";
 import type { LeadStatus, UserRole, OperacionStatus, OperacionTipo, CitaTipo } from "@/lib/types";
 
+/** Registra una acción en la bitácora del lead (historial). */
+async function logAudit(
+  pb: Awaited<ReturnType<typeof createServerClient>>,
+  leadId: string,
+  accion: string,
+  detalle?: string
+) {
+  try {
+    const actor = (pb.authStore.model as { id?: string } | null)?.id ?? null;
+    await pb.collection("lead_audit").create({
+      lead: leadId,
+      actor,
+      accion,
+      detalle: detalle ?? null,
+    });
+  } catch (err) {
+    // No romper la acción principal si el log falla
+    console.warn("Audit log error:", (err as Error)?.message);
+  }
+}
+
 export async function updateLeadStatus(leadId: string, status: LeadStatus) {
   const pb = await createServerClient();
   try {
     await pb.collection("leads").update(leadId, { status });
+    await logAudit(pb, leadId, "Cambio de etapa", `Etapa → ${status}`);
   } catch (err) {
     throw new Error((err as Error)?.message ?? "Error al actualizar estado");
   }
@@ -31,8 +53,11 @@ export async function createLead(data: Record<string, unknown>) {
   if (String(data.telefono ?? "").length < 10) {
     throw new Error("Teléfono inválido (mínimo 10 dígitos)");
   }
+  let nuevoId: string;
   try {
-    await pb.collection("leads").create(payload);
+    const creado = await pb.collection("leads").create(payload);
+    nuevoId = creado.id;
+    await logAudit(pb, nuevoId, "Lead creado", "Capturado en el pipeline");
   } catch (err) {
     throw new Error((err as Error)?.message ?? "Error al crear el lead");
   }
@@ -47,12 +72,13 @@ export async function updateLead(leadId: string, data: Record<string, unknown>) 
     "producto_interes", "monto_aproximado",
     "banco", "institucion", "curp", "rfc", "nss", "clabe",
     "tipo_credito", "fecha_nacimiento", "lugar_nacimiento",
-    "genero", "estado_civil",
+    "genero", "estado_civil", "vencimiento_documentos",
   ]) {
     if (key in data) payload[key] = data[key] ? String(data[key]) : null;
   }
   try {
     await pb.collection("leads").update(leadId, payload);
+    await logAudit(pb, leadId, "Datos editados", "Campos del lead actualizados");
   } catch (err) {
     throw new Error((err as Error)?.message ?? "Error al actualizar el lead");
   }
@@ -62,10 +88,12 @@ export async function updateLead(leadId: string, data: Record<string, unknown>) 
 
 export async function claimLead(leadId: string) {
   const pb = await createServerClient();
-  const user = pb.authStore.model;
+  const user = pb.authStore.model as { id?: string; full_name?: string; name?: string; email?: string } | null;
   if (!user?.id) throw new Error("No autenticado");
 
   await pb.collection("leads").update(leadId, { asignado_a: user.id });
+  const nombre = user.full_name || user.name || user.email || "";
+  await logAudit(pb, leadId, "Lead tomado", `Asignado a ${nombre}`);
   revalidatePath("/crm");
   revalidatePath(`/crm/leads/${leadId}`);
 }
