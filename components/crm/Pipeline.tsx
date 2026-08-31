@@ -36,23 +36,28 @@ export function Pipeline({ leads, vendedores, isAdmin }: { leads: PbLead[]; vend
   return (
     <div className="flex h-[calc(100dvh-150px)] flex-col">
       {/* Cabecera del pipeline estilo GHL */}
-      <div className="mb-4 flex items-center justify-between rounded-xl bg-slate-900 px-5 py-4 text-white shadow-lg">
-        <div>
-          <h1 className="text-lg font-bold tracking-tight">Pipeline de Leads</h1>
-          <p className="text-xs text-slate-400">
-            {total} leads en el embudo · arrastra entre etapas para mover
-          </p>
-        </div>
-        <div className="hidden items-center gap-3 text-xs text-slate-300 sm:flex">
-          <span className="rounded-full bg-slate-700 px-3 py-1">
-            <span className="font-bold text-white">{total}</span> total
-          </span>
+      <div className="mb-4 rounded-xl bg-slate-900 px-5 py-4 text-white shadow-lg">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-lg font-bold tracking-tight">Pipeline de Leads</h1>
+            <p className="text-xs text-slate-400">
+              {total} leads en el embudo · arrastra entre etapas para mover
+            </p>
+          </div>
           <button
             onClick={() => setShowAdd(true)}
-            className="rounded-full bg-blue-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-blue-500"
+            className="shrink-0 rounded-full bg-blue-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-blue-500"
           >
             + Nuevo lead
           </button>
+        </div>
+        <div className="mt-3 flex items-center gap-2 text-xs text-slate-300">
+          <span className="rounded-full bg-slate-700 px-3 py-1">
+            <span className="font-bold text-white">{total}</span> total
+          </span>
+          <span className="rounded-full bg-slate-700/60 px-3 py-1">
+            Desliza para ver todas las etapas →
+          </span>
         </div>
       </div>
 
