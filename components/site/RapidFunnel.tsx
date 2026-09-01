@@ -130,7 +130,7 @@ export function RapidFunnel() {
 
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-navy-900">
-                  NSS (Número de Seguridad Social)
+                  NSS (Número de Seguro Social)
                 </label>
                 <input
                   className={inputCls}
