@@ -53,24 +53,44 @@ export function RapidFunnel() {
     "w-full rounded-xl border border-navy-900/12 bg-cream-50 px-4 py-3 text-base text-navy-900 placeholder:text-ink-400 outline-none transition focus:border-gold-500 focus:ring-2 focus:ring-gold-500/30";
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-gold-500/15 via-navy-950 to-navy-950 py-20 text-cream-50 sm:py-24">
-      <div className="pointer-events-none absolute inset-0 opacity-[0.04]"
+    <section className="relative overflow-hidden py-20 text-cream-50 sm:py-24">
+      {/* Fondo de foto real con punch */}
+      <div
+        className="absolute inset-0 bg-cover bg-center"
+        style={{ backgroundImage: "url(/fotos/funnel-bg.webp)" }}
+      />
+      {/* Velo oscuro para legibilidad (más fuerte a la izquierda donde va el texto) */}
+      <div className="absolute inset-0 bg-gradient-to-r from-navy-950 via-navy-950/85 to-navy-950/40" />
+      <div className="absolute inset-0 bg-navy-950/30" />
+
+      {/* Resplandores animados dorados y verdes para dar punch */}
+      <div className="pointer-events-none absolute -left-20 top-1/3 h-72 w-72 rounded-full bg-gold-500/25 blur-3xl animate-pulse" />
+      <div className="pointer-events-none absolute right-0 top-1/2 h-80 w-80 rounded-full bg-[#25D366]/20 blur-3xl animate-pulse [animation-delay:0.8s]" />
+
+      {/* Textura de cuadrícula sutil */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.04]"
         style={{
           backgroundImage:
             "linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)",
           backgroundSize: "48px 48px",
         }}
       />
+
       <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-4 sm:px-6 lg:grid-cols-2">
         {/* Hook de impulso */}
         <div className="flex flex-col items-start gap-6">
-          <span className="rounded-full bg-[#25D366] px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-white">
+          <span className="inline-flex items-center gap-2 rounded-full bg-[#25D366] px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-white shadow-[0_0_25px_-4px_rgba(37,211,102,0.9)]">
+            <span className="inline-block h-2 w-2 animate-ping rounded-full bg-white" />
             ⚡ Acción rápida · 60 segundos
           </span>
           <h2 className="font-display text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl">
-            ¿Necesitas tu crédito <span className="italic text-gold-300">HOY?</span>
+            ¿Necesitas tu crédito{" "}
+            <span className="italic text-gold-300 drop-shadow-[0_0_18px_rgba(212,175,55,0.7)]">
+              HOY?
+            </span>
           </h2>
-          <ul className="space-y-3 text-lg text-cream-50/85">
+          <ul className="space-y-3 text-lg text-cream-50/90">
             <li className="flex items-start gap-3">
               <span className="mt-1 text-gold-300">✓</span>
               Aprobado y depositado el mismo día si solicitas antes de las 3:00 pm.
@@ -84,13 +104,13 @@ export function RapidFunnel() {
               Asesoría personalizada de principio a fin.
             </li>
           </ul>
-          <p className="text-sm text-cream-50/60">
+          <p className="text-sm text-cream-50/70">
             Déjanos tu información y un asesor te contacta de inmediato para revisar tu caso.
           </p>
         </div>
 
         {/* Formulario exprés */}
-        <div className="rounded-3xl bg-white p-7 text-navy-900 shadow-[0_30px_60px_-20px_rgba(0,0,0,0.6)] sm:p-9">
+        <div className="rounded-3xl bg-white p-7 text-navy-900 shadow-[0_30px_60px_-20px_rgba(0,0,0,0.7)] sm:p-9">
           {estado === "ok" ? (
             <div className="flex flex-col items-center gap-4 py-10 text-center">
               <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#25D366]/15 text-3xl text-[#25D366]">
@@ -161,7 +181,7 @@ export function RapidFunnel() {
               <button
                 type="submit"
                 disabled={estado === "enviando"}
-                className="w-full rounded-full bg-[#25D366] py-3.5 text-base font-semibold text-white shadow-[0_10px_30px_-6px_rgba(37,211,102,0.6)] transition hover:bg-[#1ebe5b] disabled:opacity-60"
+                className="w-full rounded-full bg-[#25D366] py-3.5 text-base font-semibold text-white shadow-[0_10px_30px_-6px_rgba(37,211,102,0.7)] transition hover:bg-[#1ebe5b] disabled:opacity-60"
               >
                 {estado === "enviando" ? "Enviando..." : "Solicitar mi crédito →"}
               </button>
