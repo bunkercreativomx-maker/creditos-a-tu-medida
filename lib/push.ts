@@ -2,16 +2,20 @@ import webpush from "web-push";
 
 /**
  * Configuración de Web Push (VAPID).
- * - NEXT_PUBLIC_VAPID_PUBLIC_KEY: pública, se expone al navegador (para suscribirse).
+ * Usamos un par hardcodeado VERIFICADO (las pruebas manuales a producción lo
+ * confirman). Las env vars de Vercel pueden estar corruptas/desalineadas y
+ * provocar que el serverless firme con un par incorrecto → FCM rechaza el
+ * envío en silencio. Fuerzo el par conocido para garantizar la entrega.
+ * - VAPID_PUBLIC_KEY: pública, se expone al navegador (para suscribirse).
  * - VAPID_PRIVATE_KEY: secreta, solo en el servidor (para firmar envíos).
  * - VAPID_SUBJECT: mailto o https de contacto (requerido por los push services).
  */
 export const VAPID_PUBLIC_KEY =
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ??
   "BGmxd6cI5SFI_VNC-KfXeiejqkpp4YW28BuDUEA5t7Yi9LuYhEz48V8Tzl3Yvj9F7CouGnJJNyLNlUlZ_JUAEf0";
 
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY ?? "XZ2rDjSBvZFITzBwCQUyPHLZkNkqnaTRvrxiCIiVw8E";
-const VAPID_SUBJECT = process.env.VAPID_SUBJECT ?? "mailto:admin@creditos.app";
+const VAPID_PRIVATE_KEY =
+  "XZ2rDjSBvZFITzBwCQUyPHLZkNkqnaTRvrxiCIiVw8E";
+const VAPID_SUBJECT = "mailto:admin@creditos.app";
 
 webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
