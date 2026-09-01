@@ -128,12 +128,12 @@ export function Hero() {
             transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
           >
             <Image
-              src="/hero-illustration.png"
-              alt="Cliente satisfecho revisando su crédito aprobado desde el celular"
-              width={928}
-              height={1152}
+              src="/fotos/hero-real.webp"
+              alt="Cliente pensionado satisfecho revisando su crédito aprobado desde el celular"
+              width={600}
+              height={800}
               priority
-              className="relative mx-auto h-auto w-full max-w-sm drop-shadow-2xl"
+              className="relative mx-auto h-auto w-full max-w-sm rounded-3xl object-cover shadow-2xl ring-1 ring-cream-50/20"
             />
           </motion.div>
         </motion.div>

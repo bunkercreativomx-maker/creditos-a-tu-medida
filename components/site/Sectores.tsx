@@ -1,4 +1,4 @@
-import { REQUISITOS, SECTORES, WHATSAPP_LINK } from "@/lib/site-content";
+import { REQUISITOS, WHATSAPP_LINK } from "@/lib/site-content";
 import { Reveal } from "./Reveal";
 import { WhatsAppIcon } from "./WhatsAppIcon";
 
@@ -17,12 +17,28 @@ export function Sectores() {
             Créditos vía nómina para trabajadores y pensionados de instituciones con convenio.
           </p>
           <ul className="mt-6 grid grid-cols-2 gap-3">
-            {SECTORES.map((sector) => (
+            {[
+              { nombre: "Pensionados", img: "/fotos/sector-pensionado.webp" },
+              { nombre: "Jubilados", img: "/fotos/sector-jubilado.webp" },
+              { nombre: "Gobierno", img: "/fotos/sector-gobierno.webp" },
+              { nombre: "Educación", img: "/fotos/sector-educacion.webp" },
+            ].map((sector) => (
               <li
-                key={sector}
-                className="rounded-xl border border-navy-900/8 bg-cream-50 px-4 py-3 text-center font-medium text-navy-900"
+                key={sector.nombre}
+                className="group overflow-hidden rounded-xl border border-navy-900/8 bg-white shadow-sm transition-shadow hover:shadow-md"
               >
-                {sector}
+                <div className="relative h-24 w-full overflow-hidden bg-cream-100 sm:h-28">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={sector.img}
+                    alt={`Cliente ${sector.nombre.toLowerCase()}`}
+                    loading="lazy"
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  />
+                </div>
+                <div className="px-3 py-2.5 text-center font-medium text-navy-900">
+                  {sector.nombre}
+                </div>
               </li>
             ))}
           </ul>
