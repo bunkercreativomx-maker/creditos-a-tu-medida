@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/pocketbase-client";
+import { PushNotifier } from "@/components/crm/PushNotifier";
 
 const TABS = [
   { href: "/crm", label: "Dashboard", icon: "📊" },
@@ -51,6 +52,7 @@ export function CrmNav({ fullName, role, leadsNuevosHoy }: { fullName: string; r
             </Link>
           </div>
           <div className="flex items-center gap-4 text-sm">
+            <PushNotifier />
             <span className="hidden text-slate-600 sm:inline">
               {fullName} · <span className="uppercase text-slate-400">{role}</span>
             </span>

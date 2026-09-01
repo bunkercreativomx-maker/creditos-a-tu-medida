@@ -19,6 +19,16 @@ export const metadata: Metadata = {
   title: "Créditos a tu medida | Créditos vía nómina",
   description:
     "Créditos vía nómina para pensionados, jubilados, gobierno y educación, en alianza con Financiera Fortaleza. Aprobación rápida, sin complicaciones.",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Créditos",
+  },
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/icon-192.png",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

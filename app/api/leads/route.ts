@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/pocketbase-admin";
+import { notifyNewLead } from "@/lib/push";
 import type { LeadOrigen, TipoCredito, Genero, EstadoCivil } from "@/lib/types";
 
 const DOCUMENT_FIELDS = [
@@ -93,6 +94,13 @@ export async function POST(req: NextRequest) {
       // El lead ya se creó; reportar pero no romper el flujo
     }
   }
+
+  // Notificar a los asesores por push (fire-and-forget)
+  notifyNewLead({
+    nombre: insertPayload.nombre as string | null,
+    apellido: insertPayload.apellido as string | null,
+    monto_aproximado: insertPayload.monto_aproximado as string | null,
+  });
 
   return NextResponse.json({ ok: true, lead_id: lead.id }, { status: 201 });
 }

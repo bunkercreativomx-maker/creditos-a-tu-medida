@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createServerClient } from "@/lib/pocketbase-server";
+import { notifyNewLead } from "@/lib/push";
 import type { LeadStatus, UserRole, OperacionStatus, OperacionTipo, CitaTipo } from "@/lib/types";
 
 /** Registra una acción en la bitácora del lead (historial). */
@@ -58,6 +59,12 @@ export async function createLead(data: Record<string, unknown>) {
     const creado = await pb.collection("leads").create(payload);
     nuevoId = creado.id;
     await logAudit(pb, nuevoId, "Lead creado", "Capturado en el pipeline");
+    // Notificar a los asesores por push (fire-and-forget)
+    notifyNewLead({
+      nombre: payload.nombre,
+      apellido: payload.apellido,
+      monto_aproximado: payload.monto_aproximado,
+    });
   } catch (err) {
     throw new Error((err as Error)?.message ?? "Error al crear el lead");
   }
