@@ -2,13 +2,7 @@
 
 import { useState, type ChangeEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  BANCOS,
-  ESTADOS_CIVILES,
-  GENEROS,
-  MONTOS_APROXIMADOS,
-  TIPOS_CREDITO_OPCIONES,
-} from "@/lib/site-content";
+import { MONTOS_APROXIMADOS } from "@/lib/site-content";
 
 type Status = "idle" | "sending" | "sent" | "error";
 type DocKey = "ine_frente" | "ine_reverso" | "comprobante_domicilio";
@@ -27,20 +21,10 @@ const DOC_FIELDS: { docKey: DocKey; label: string; helper: string }[] = [
     label: "Foto INE (frente)",
     helper: "Coloca tu INE sobre superficie plana, asegúrate que se vea completo y nítido (Máx 25MB)",
   },
-  {
-    docKey: "ine_reverso",
-    label: "Foto INE (reverso)",
-    helper: "Voltea tu INE y toma la foto del reverso en superficie plana (Máx 25MB)",
-  },
-  {
-    docKey: "comprobante_domicilio",
-    label: "Comprobante de domicilio",
-    helper: "El documento debe ser reciente (máx. 3 meses) y mostrar tu nombre y dirección (Máx 25MB)",
-  },
 ];
 
-const REQUIRED_PERSONAL = ["nombre", "apellido", "telefono", "fecha_nacimiento", "lugar_nacimiento", "genero", "estado_civil"];
-const REQUIRED_FINANCIERO = ["curp", "rfc", "nss", "institucion", "tipo_credito", "monto_aproximado", "banco", "clabe"];
+const REQUIRED_PERSONAL = ["nombre", "apellido", "telefono", "fecha_nacimiento"];
+const REQUIRED_FINANCIERO = ["curp", "nss", "institucion", "monto_aproximado"];
 
 export function ContactForm() {
   const [step, setStep] = useState(1);
@@ -139,23 +123,6 @@ export function ContactForm() {
               onChange={setField}
               required
             />
-            <Field
-              label="Lugar de Nacimiento"
-              name="lugar_nacimiento"
-              placeholder="Estado o ciudad"
-              value={data.lugar_nacimiento}
-              onChange={setField}
-              required
-            />
-            <SelectField label="Género" name="genero" value={data.genero} onChange={setField} options={GENEROS} required />
-            <SelectField
-              label="Estado Civil"
-              name="estado_civil"
-              value={data.estado_civil}
-              onChange={setField}
-              options={ESTADOS_CIVILES}
-              required
-            />
             <div className="sm:col-span-2">
               <NavButtons onNext={() => setStep(2)} nextDisabled={!canAdvance(REQUIRED_PERSONAL)} />
             </div>
@@ -172,7 +139,6 @@ export function ContactForm() {
             className="mt-8 grid gap-4 sm:grid-cols-2"
           >
             <Field label="CURP" name="curp" value={data.curp} onChange={setField} required />
-            <Field label="RFC" name="rfc" value={data.rfc} onChange={setField} required />
             <Field label="Número de Pensión / NSS" name="nss" value={data.nss} onChange={setField} required />
             <Field
               label="Institución"
@@ -183,38 +149,12 @@ export function ContactForm() {
               required
             />
             <SelectField
-              label="Tipo de Crédito"
-              name="tipo_credito"
-              value={data.tipo_credito}
-              onChange={setField}
-              options={TIPOS_CREDITO_OPCIONES}
-              placeholder="Selecciona el tipo"
-              required
-            />
-            <SelectField
               label="Monto Aproximado"
               name="monto_aproximado"
               value={data.monto_aproximado}
               onChange={setField}
               options={MONTOS_APROXIMADOS.map((m) => ({ value: m, label: m }))}
               placeholder="¿Cuánto necesitas?"
-              required
-            />
-            <SelectField
-              label="Banco"
-              name="banco"
-              value={data.banco}
-              onChange={setField}
-              options={BANCOS.map((b) => ({ value: b, label: b }))}
-              required
-            />
-            <Field
-              label="CLABE Interbancaria"
-              name="clabe"
-              placeholder="18 dígitos"
-              maxLength={18}
-              value={data.clabe}
-              onChange={setField}
               required
             />
             <div className="sm:col-span-2">
