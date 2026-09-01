@@ -56,17 +56,17 @@ export function Countdown() {
   const esHoy = segundosDelDia < segundosCorte;
 
   return (
-    <div className="inline-flex flex-col items-center gap-1 rounded-2xl border border-gold-500/25 bg-gold-500/10 px-4 py-2.5">
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-gold-300">
+    <div className="inline-flex flex-col items-center gap-1.5 rounded-2xl border border-gold-500/30 bg-gold-500/10 px-6 py-4">
+      <span className="text-xs font-semibold uppercase tracking-wider text-gold-300">
         Hora en Ciudad Juárez · {pad(t.hour)}:{pad(t.minute)}:{pad(t.second)}
       </span>
-      <span className="font-display text-lg font-semibold tabular-nums text-cream-50">
+      <span className="font-display text-4xl font-bold tabular-nums leading-none text-cream-50 sm:text-5xl">
         {esHoy ? "Quedan" : "Siguiente corte en"}{" "}
         <span className="text-gold-300">
           {pad(h)}:{pad(m)}:{pad(s)}
         </span>
       </span>
-      <span className="text-[10px] text-cream-50/60">
+      <span className="text-sm font-medium text-cream-50/70">
         {esHoy ? "para tu crédito el mismo día" : "para tu crédito mañana"}
       </span>
     </div>
