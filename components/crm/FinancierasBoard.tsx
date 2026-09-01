@@ -15,6 +15,9 @@ const STATUS_OPTIONS: { value: OperacionStatus; label: string }[] = [
 const TIPO_OPTIONS: { value: OperacionTipo; label: string }[] = [
   { value: "pensionado", label: "Pensionado" },
   { value: "jubilado", label: "Jubilado" },
+  { value: "jubilado_issste", label: "Jubilado ISSSTE" },
+  { value: "snt8", label: "SNT8" },
+  { value: "sector_salud", label: "Sector Salud" },
 ];
 
 /** Convierte fecha PB (ISO) a valor para <input type="date"> (YYYY-MM-DD). */

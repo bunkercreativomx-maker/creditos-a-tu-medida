@@ -124,7 +124,7 @@ export type PbFinanciera = {
 };
 
 export type OperacionStatus = "pendiente" | "en_proceso" | "aprobado" | "finalizado" | "no_cumple";
-export type OperacionTipo = "pensionado" | "jubilado";
+export type OperacionTipo = "pensionado" | "jubilado" | "jubilado_issste" | "snt8" | "sector_salud";
 
 /** Registro de la colección `operaciones` (tablero de financieras por lead). */
 export type PbOperacion = {
