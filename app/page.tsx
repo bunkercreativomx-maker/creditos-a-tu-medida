@@ -1,5 +1,6 @@
 import { Header } from "@/components/site/Header";
 import { Hero } from "@/components/site/Hero";
+import { RapidFunnel } from "@/components/site/RapidFunnel";
 import { TiposCredito } from "@/components/site/TiposCredito";
 import { Sectores } from "@/components/site/Sectores";
 import { Beneficios } from "@/components/site/Beneficios";
@@ -14,6 +15,7 @@ export default function Home() {
       <Header />
       <main className="flex-1">
         <Hero />
+        <RapidFunnel />
         <TiposCredito />
         <Sectores />
         <Beneficios />
