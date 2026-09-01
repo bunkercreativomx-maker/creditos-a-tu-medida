@@ -79,8 +79,9 @@ export const TIPOS_CREDITO = [
 export const BENEFICIOS = [
   {
     icon: "calendarPay" as const,
-    titulo: "Dinero en 48 horas",
-    descripcion: "Una vez aprobado tu crédito, recibes el dinero en 48 horas.",
+    titulo: "Dinero el mismo día",
+        descripcion:
+          "Solicita antes de las 3:00 pm y tu crédito se aprueba y deposita el mismo día. Después de esa hora, el depósito cepósito cae al día siguiente.",
   },
   {
     icon: "noGuarantee" as const,

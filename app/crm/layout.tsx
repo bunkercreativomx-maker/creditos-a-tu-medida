@@ -1,5 +1,20 @@
 import { createServerClient } from "@/lib/pocketbase-server";
 import { CrmNav } from "@/components/crm/CrmNav";
+import type { Metadata } from "next";
+
+// El CRM es la única parte instalable como PWA (la landing no debe ofrecerlo).
+export const metadata: Metadata = {
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Créditos",
+  },
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/icon-192.png",
+  },
+};
 
 export default async function CrmLayout({ children }: { children: React.ReactNode }) {
   const pb = await createServerClient();
