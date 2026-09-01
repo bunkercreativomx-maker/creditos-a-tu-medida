@@ -81,7 +81,7 @@ export const BENEFICIOS = [
     icon: "calendarPay" as const,
     titulo: "Dinero el mismo día",
         descripcion:
-          "Solicita antes de las 3:00 pm y tu crédito se aprueba y deposita el mismo día. Después de esa hora, el depósito cepósito cae al día siguiente.",
+          "Solicita antes de las 3:00 pm y tu crédito se aprueba y deposita el mismo día. Después de esa hora, el depósito cae al día siguiente.",
   },
   {
     icon: "noGuarantee" as const,
@@ -114,5 +114,5 @@ export const PROCESO = [
   { icon: "headset" as const, titulo: "Contacto con el cliente", descripcion: "Nos escribes por WhatsApp o llenas el formulario." },
   { icon: "checklist" as const, titulo: "Análisis y documentos", descripcion: "Revisamos tu caso y recolectamos tus documentos." },
   { icon: "signature" as const, titulo: "Firma de papelería", descripcion: "Firmas tu contrato de forma simple y segura." },
-  { icon: "cashDelivery" as const, titulo: "Entrega del crédito", descripcion: "Recibes tu dinero en 48 horas tras la aprobación." },
+  { icon: "cashDelivery" as const, titulo: "Entrega del crédito", descripcion: "Recibes tu dinero el mismo día si solicitas antes de las 3:00 pm; después de esa hora, el depósito cae al día siguiente." },
 ];

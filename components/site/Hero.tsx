@@ -11,7 +11,7 @@ const ease = [0.22, 1, 0.36, 1] as const;
 
 const STATS = [
   { value: 20, suffix: "+", label: "años en el mercado" },
-  { value: 48, suffix: "h", label: "entrega de tu crédito" },
+  { value: 15, suffix: "h", label: "para tu crédito el mismo día" },
   { value: 100, suffix: "%", label: "financiera mexicana" },
 ];
 
