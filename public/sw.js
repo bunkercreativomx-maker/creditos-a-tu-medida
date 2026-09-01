@@ -35,20 +35,30 @@ self.addEventListener("fetch", (event) => {
 
 // --- Web Push ---
 self.addEventListener("push", (event) => {
-  let data = { title: "Nuevo lead", body: "Tienes un nuevo lead en el CRM", url: "/crm" };
+  let data = { title: "Nuevo lead", body: "Tienes un nuevo lead en el CRM", url: "/crm", badge: 1 };
   try {
     if (event.data) data = { ...data, ...event.data.json() };
   } catch {
     /* payload no JSON */
   }
   event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: "/icon-192.png",
-      badge: "/icon-192.png",
-      data: { url: data.url || "/crm" },
-      vibrate: [200, 100, 200],
-    })
+    (async () => {
+      // Actualizar el badge numérico del ícono con el conteo de leads.
+      try {
+        if (typeof self.registration.setAppBadge === "function") {
+          await self.registration.setAppBadge(Number(data.badge) || 1);
+        }
+      } catch {
+        /* badge no soportado (iOS) */
+      }
+      await self.registration.showNotification(data.title, {
+        body: data.body,
+        icon: "/icon-192.png",
+        badge: "/icon-192.png",
+        data: { url: data.url || "/crm" },
+        vibrate: [200, 100, 200],
+      });
+    })()
   );
 });
 

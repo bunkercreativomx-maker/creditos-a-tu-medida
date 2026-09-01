@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/pocketbase-client";
 import { PushNotifier } from "@/components/crm/PushNotifier";
 
@@ -20,6 +20,24 @@ export function CrmNav({ fullName, role, leadsNuevosHoy }: { fullName: string; r
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // Badge numérico en el ícono de la app (PWA) con el conteo de leads nuevos.
+  useEffect(() => {
+    if (typeof navigator === "undefined") return;
+    const n = typeof leadsNuevosHoy === "number" ? leadsNuevosHoy : 0;
+    try {
+      if ("setAppBadge" in navigator) {
+        const anyNav = navigator as unknown as {
+          setAppBadge?: (n?: number) => Promise<void>;
+          clearAppBadge?: () => Promise<void>;
+        };
+        if (n > 0) void anyNav.setAppBadge?.(n);
+        else void anyNav.clearAppBadge?.();
+      }
+    } catch {
+      /* badge no soportado (iOS) — se ignora */
+    }
+  }, [leadsNuevosHoy]);
 
   async function handleLogout() {
     const pb = createClient();
@@ -120,14 +138,19 @@ export function CrmNav({ fullName, role, leadsNuevosHoy }: { fullName: string; r
           <Link
             href="/crm/pipeline"
             onClick={() => setMenuOpen(false)}
-            className="mb-2 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 transition-colors hover:bg-emerald-100"
+            className="mb-2 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 transition-colors hover:bg-red-100"
           >
             <span className="relative flex h-2.5 w-2.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
             </span>
-            <span className="font-semibold">🆕 {leadsNuevosHoy} {leadsNuevosHoy === 1 ? "lead nuevo" : "leads nuevos"} hoy</span>
-            <span className="ml-auto text-xs text-emerald-600">Ver pipeline →</span>
+            <span className="font-semibold">
+              <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 py-0.5 text-xs font-bold text-white">
+                {leadsNuevosHoy}
+              </span>{" "}
+              {leadsNuevosHoy === 1 ? "lead nuevo" : "leads nuevos"}
+            </span>
+            <span className="ml-auto text-xs text-red-600">Ver pipeline →</span>
           </Link>
         )}
       </div>

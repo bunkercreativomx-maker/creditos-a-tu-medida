@@ -18,7 +18,7 @@ webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 /** Envía una notificación push a una suscripción. Devuelve true si fue exitoso. */
 export async function sendPush(
   subscription: { endpoint: string; keys: { p256dh: string; auth: string } },
-  payload: { title: string; body: string; url?: string }
+  payload: { title: string; body: string; url?: string; badge?: number }
 ): Promise<boolean> {
   try {
     await webpush.sendNotification(subscription, JSON.stringify(payload), { TTL: 60 });
@@ -49,11 +49,25 @@ export async function notifyNewLead(lead: { nombre?: string | null; apellido?: s
     const title = "📩 Nuevo lead";
     const body = `${nombre}${monto}`;
 
+    // Contar leads nuevos de hoy para el badge del ícono.
+    const inicioHoy = new Date();
+    inicioHoy.setHours(0, 0, 0, 0);
+    const desde = inicioHoy.toISOString();
+    let badge = 1;
+    try {
+      const res = await pb
+        .collection("leads")
+        .getList(1, 1, { filter: `status = "nuevo" && created >= "${desde}"` });
+      badge = res.totalItems;
+    } catch {
+      badge = 1;
+    }
+
     const dead: string[] = [];
     for (const s of subs) {
       const ok = await sendPush(
         { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-        { title, body, url: "/crm" }
+        { title, body, url: "/crm", badge }
       );
       if (!ok) dead.push(s.id);
     }
