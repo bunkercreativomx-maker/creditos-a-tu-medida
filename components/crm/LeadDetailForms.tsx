@@ -63,6 +63,7 @@ export function LeadDataEditor({ lead }: { lead: PbLead }) {
           <option value="">—</option>
           <option value="nuevo">Nuevo</option>
           <option value="renovacion">Renovación</option>
+          <option value="compra">Compra</option>
         </select>
       } />
       <Field label="Fecha de nacimiento" input={<input className={inputCls} value={form.fecha_nacimiento} onChange={(e) => set("fecha_nacimiento", e.target.value)} placeholder="YYYY-MM-DD" />} />

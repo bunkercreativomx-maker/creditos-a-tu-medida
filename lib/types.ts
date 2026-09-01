@@ -12,7 +12,7 @@ export type LeadStatus =
   | "cerrado_perdido";
 
 export type LeadOrigen = "web_form" | "whatsapp";
-export type TipoCredito = "nuevo" | "renovacion";
+export type TipoCredito = "nuevo" | "renovacion" | "compra";
 export type Genero = "masculino" | "femenino";
 export type EstadoCivil = "soltero" | "casado" | "divorciado" | "viudo" | "union_libre";
 export type MensajeRemitente = "cliente" | "bot" | "asesor";

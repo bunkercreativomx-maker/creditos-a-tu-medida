@@ -28,6 +28,7 @@ export const ESTADOS_CIVILES = [
 export const TIPOS_CREDITO_OPCIONES = [
   { value: "nuevo", label: "Crédito Nuevo" },
   { value: "renovacion", label: "Renovación" },
+  { value: "compra", label: "Compra" },
 ];
 
 export const MONTOS_APROXIMADOS = [
