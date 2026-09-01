@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { motion } from "framer-motion";
 import { SECTORES, WHATSAPP_LINK } from "@/lib/site-content";
 import { WhatsAppIcon } from "./WhatsAppIcon";
@@ -17,25 +16,32 @@ const STATS = [
 
 export function Hero() {
   return (
-    <section className="relative overflow-hidden bg-navy-950 text-cream-50">
-      <div
-        className="pointer-events-none absolute inset-0 opacity-70"
-        style={{
-          background:
-            "radial-gradient(60% 50% at 78% 15%, rgba(201,162,39,0.16) 0%, rgba(201,162,39,0) 70%), radial-gradient(45% 40% at 10% 90%, rgba(30,58,102,0.5) 0%, rgba(30,58,102,0) 70%)",
-        }}
-      />
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.04]"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)",
-          backgroundSize: "56px 56px",
-        }}
-      />
+    <section className="relative min-h-[92vh] overflow-hidden bg-navy-950 text-cream-50">
+      {/* Foto real como fondo, fundida con el diseño */}
+      <div className="absolute inset-0">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/fotos/hero-bg.webp"
+          alt="Cliente pensionado satisfecho revisando su crédito aprobado"
+          className="h-full w-full object-cover object-[75%_center]"
+        />
+        {/* Degradado oscuro desde la izquierda para legibilidad y fusión */}
+        <div className="absolute inset-0 bg-gradient-to-r from-navy-950 via-navy-950/85 to-navy-950/20" />
+        {/* Velo sutil para unificar la foto con el fondo */}
+        <div className="absolute inset-0 bg-navy-950/30" />
+        {/* Textura sutil de cuadrícula */}
+        <div
+          className="absolute inset-0 opacity-[0.05]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)",
+            backgroundSize: "56px 56px",
+          }}
+        />
+      </div>
 
-      <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-4 py-20 sm:px-6 sm:py-28 lg:grid-cols-2 lg:py-32">
-        <div className="flex flex-col items-start gap-7">
+      <div className="relative mx-auto flex min-h-[92vh] max-w-6xl flex-col justify-center px-4 py-24 sm:px-6">
+        <div className="flex max-w-2xl flex-col items-start gap-7">
           <motion.span
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
@@ -49,7 +55,7 @@ export function Hero() {
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.08, ease }}
-            className="max-w-xl font-display text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl"
+            className="font-display text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl lg:text-6xl"
           >
             Tu crédito aprobado y depositado <br />
             <span className="italic text-gold-300">el mismo día</span>
@@ -59,7 +65,7 @@ export function Hero() {
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.16, ease }}
-            className="max-w-xl text-lg leading-relaxed text-cream-50/70"
+            className="max-w-xl text-lg leading-relaxed text-cream-50/85"
           >
             Créditos para {SECTORES.join(", ")} de instituciones con convenio. Sin complicaciones,
             sin comisiones ocultas, con asesoría personalizada de principio a fin.
@@ -77,7 +83,7 @@ export function Hero() {
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.22, ease }}
-            className="max-w-md text-sm leading-relaxed text-cream-50/75"
+            className="max-w-md text-base leading-relaxed text-cream-50/80"
           >
             Solicita antes de las 3:00 pm y recibe tu crédito el mismo día. Después de esa hora,
             tu crédito se deposita al día siguiente.
@@ -110,33 +116,11 @@ export function Hero() {
                 <div className="font-display text-2xl font-semibold text-gold-300 sm:text-3xl">
                   <AnimatedCounter value={stat.value} suffix={stat.suffix} />
                 </div>
-                <p className="mt-1 text-xs leading-snug text-cream-50/55">{stat.label}</p>
+                <p className="mt-1 text-xs leading-snug text-cream-50/70">{stat.label}</p>
               </div>
             ))}
           </motion.div>
         </div>
-
-        <motion.div
-          initial={{ opacity: 0, scale: 0.94 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.9, delay: 0.15, ease }}
-          className="relative mx-auto w-full max-w-sm lg:max-w-none"
-        >
-          <div className="pointer-events-none absolute inset-0 -z-10 scale-90 rounded-full bg-gold-500/20 blur-[80px]" />
-          <motion.div
-            animate={{ y: [0, -10, 0] }}
-            transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-          >
-            <Image
-              src="/fotos/hero-real.webp"
-              alt="Cliente pensionado satisfecho revisando su crédito aprobado desde el celular"
-              width={600}
-              height={800}
-              priority
-              className="relative mx-auto h-auto w-full max-w-sm rounded-3xl object-cover shadow-2xl ring-1 ring-cream-50/20"
-            />
-          </motion.div>
-        </motion.div>
       </div>
     </section>
   );
