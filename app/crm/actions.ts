@@ -59,8 +59,8 @@ export async function createLead(data: Record<string, unknown>) {
     const creado = await pb.collection("leads").create(payload);
     nuevoId = creado.id;
     await logAudit(pb, nuevoId, "Lead creado", "Capturado en el pipeline");
-    // Notificar a los asesores por push (fire-and-forget)
-    notifyNewLead({
+    // Notificar a los asesores por push (esperar: serverless congela tras responder)
+    await notifyNewLead({
       nombre: payload.nombre,
       apellido: payload.apellido,
       monto_aproximado: payload.monto_aproximado,

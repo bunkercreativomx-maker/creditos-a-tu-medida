@@ -49,16 +49,16 @@ export async function notifyNewLead(lead: { nombre?: string | null; apellido?: s
     const title = "📩 Nuevo lead";
     const body = `${nombre}${monto}`;
 
-    // Contar leads nuevos de hoy para el badge del ícono.
-    const inicioHoy = new Date();
-    inicioHoy.setHours(0, 0, 0, 0);
-    const desde = inicioHoy.toISOString();
+    // Contar leads en estado "nuevo" para el badge del ícono.
+    // NOTA: esta colección no permite sort por `created` (da 400), así que
+    // contamos por status sin ordenar. Fire-and-forget: ante cualquier error,
+    // badge = 1 (no bloquea el envío).
     let badge = 1;
     try {
-      const res = await pb
-        .collection("leads")
-        .getList(1, 1, { filter: `status = "nuevo" && created >= "${desde}"` });
-      badge = res.totalItems;
+      const res = await pb.collection("leads").getList(1, 1, {
+        filter: `status = "nuevo"`,
+      });
+      badge = Math.max(res.totalItems, 1);
     } catch {
       badge = 1;
     }

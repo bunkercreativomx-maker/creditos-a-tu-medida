@@ -95,8 +95,9 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Notificar a los asesores por push (fire-and-forget)
-  notifyNewLead({
+  // Notificar a los asesores por push (esperar: en serverless el proceso se
+  // congela tras responder, un fire-and-forget sin await se corta a mitad).
+  await notifyNewLead({
     nombre: insertPayload.nombre as string | null,
     apellido: insertPayload.apellido as string | null,
     monto_aproximado: insertPayload.monto_aproximado as string | null,
