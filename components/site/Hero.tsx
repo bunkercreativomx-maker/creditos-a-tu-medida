@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { SECTORES, WHATSAPP_LINK } from "@/lib/site-content";
 import { WhatsAppIcon } from "./WhatsAppIcon";
 import { AnimatedCounter } from "./AnimatedCounter";
+import { Countdown } from "./Countdown";
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
@@ -45,30 +46,48 @@ export function Hero() {
           </motion.span>
 
           <motion.h1
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.08, ease }}
-            className="max-w-xl font-display text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl"
-          >
-            Tu crédito vía nómina, <br />
-            <span className="italic text-gold-300">aprobado en 48 horas</span>
-          </motion.h1>
+                      initial={{ opacity: 0, y: 18 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.7, delay: 0.08, ease }}
+                      className="max-w-xl font-display text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl"
+                    >
+                      Tu crédito aprobado <br />
+                      <span className="italic text-gold-300">al mismo día</span>
+                    </motion.h1>
 
-          <motion.p
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.16, ease }}
-            className="max-w-xl text-lg leading-relaxed text-cream-50/70"
-          >
-            Créditos para {SECTORES.join(", ")} de instituciones con convenio. Sin complicaciones,
-            sin comisiones ocultas, con asesoría personalizada de principio a fin.
-          </motion.p>
+                    <motion.p
+                      initial={{ opacity: 0, y: 18 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.7, delay: 0.16, ease }}
+                      className="max-w-xl text-lg leading-relaxed text-cream-50/70"
+                    >
+                      Créditos para {SECTORES.join(", ")} de instituciones con convenio. Sin complicaciones,
+                      sin comisiones ocultas, con asesoría personalizada de principio a fin.
+                    </motion.p>
 
-          <motion.div
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.24, ease }}
-          >
+                    <motion.div
+                      initial={{ opacity: 0, y: 18 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.7, delay: 0.2, ease }}
+                    >
+                      <Countdown />
+                    </motion.div>
+
+                    <motion.p
+                      initial={{ opacity: 0, y: 18 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.7, delay: 0.22, ease }}
+                      className="max-w-md text-xs leading-relaxed text-cream-50/55"
+                    >
+                      Solicita antes de las 3:00 pm y recibe tu crédito el mismo día. Después de esa hora,
+                      tu crédito se aprueba al día siguiente.
+                    </motion.p>
+
+                    <motion.div
+                      initial={{ opacity: 0, y: 18 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.7, delay: 0.24, ease }}
+                    >
             <a
               href={WHATSAPP_LINK}
               target="_blank"
