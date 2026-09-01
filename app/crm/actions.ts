@@ -132,8 +132,22 @@ export async function sendAdvisorMessage(conversationId: string, telefono: strin
     contenido,
   });
 
-  const { sendWhatsAppMessage } = await import("@/lib/zernio");
-  await sendWhatsAppMessage(telefono, contenido);
+  // Leer los ids de Zernio guardados en la conversación para responder al hilo real.
+  const conv = await pb
+    .collection("conversations")
+    .getOne(conversationId)
+    .catch(() => null) as unknown as {
+    zernio_conversation_id?: string;
+    zernio_account_id?: string;
+  } | null;
+
+  const zc = conv?.zernio_conversation_id;
+  const za = conv?.zernio_account_id;
+
+  if (zc && za) {
+    const { sendWhatsAppMessage } = await import("@/lib/zernio");
+    await sendWhatsAppMessage(zc, za, contenido);
+  }
 }
 
 export async function deleteLead(leadId: string) {

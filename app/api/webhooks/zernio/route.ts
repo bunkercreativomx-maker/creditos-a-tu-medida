@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyZernioSignature, sendWhatsAppMessage, type ZernioInboundEvent } from "@/lib/zernio";
+import {
+  verifyZernioSignature,
+  sendWhatsAppMessage,
+  parseInboundMessage,
+  type ZernioInboundEvent,
+} from "@/lib/zernio";
 import { runBotTurn } from "@/lib/bot";
 import { createAdminClient } from "@/lib/pocketbase-admin";
 import { notifyNewLeadToSlack } from "@/lib/slack-notify";
@@ -25,15 +30,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, deduped: true });
   }
 
+  // El primer webhook de prueba que llega al configurar es webhook.test — lo aceptamos
+  // pero no procesamos como mensaje.
   if (event.event !== "message.received") {
     return NextResponse.json({ ok: true, ignored: event.event });
   }
 
-  const telefono = event.data.from;
-  const texto = event.data.text;
+  const parsed = parseInboundMessage(event);
+  const telefono = parsed.telefono;
+  const texto = parsed.text;
   if (!telefono || !texto) {
     return NextResponse.json({ ok: true, ignored: "payload incompleto" });
   }
+
+  const pbConversationId = parsed.conversationId;
+  const pbAccountId = parsed.accountId;
 
   // Upsert lead por teléfono
   const existingLead = await pb
@@ -48,7 +59,7 @@ export async function POST(req: NextRequest) {
   } else {
     const newLead = await pb.collection("leads").create({
       telefono,
-      nombre: event.data.contact_name ?? null,
+      nombre: parsed.nombre ?? null,
       origen: "whatsapp",
       status: "nuevo",
     });
@@ -67,12 +78,19 @@ export async function POST(req: NextRequest) {
   if (existingConversation) {
     conversationId = existingConversation.id;
     botActivo = existingConversation.bot_activo;
+    // Refrescar los ids de Zernio por si cambiaron
+    await pb.collection("conversations").update(conversationId, {
+      zernio_conversation_id: pbConversationId,
+      zernio_account_id: pbAccountId,
+    });
   } else {
     const newConversation = await pb.collection("conversations").create({
       lead: leadId,
       telefono,
       canal: "whatsapp",
       bot_activo: true,
+      zernio_conversation_id: pbConversationId,
+      zernio_account_id: pbAccountId,
     });
     conversationId = newConversation.id;
     botActivo = newConversation.bot_activo;
@@ -96,17 +114,24 @@ export async function POST(req: NextRequest) {
       sort: "-id",
     });
 
-  const history = (recentMessages.items ?? [] as unknown as { remitente: string; contenido: string }[])
+  const history = (
+    (recentMessages.items ?? []) as unknown as {
+      remitente: string;
+      contenido: string;
+    }[]
+  )
     .filter((m) => m.remitente !== "asesor")
     .map((m) => ({
-      role: (m.remitente === "cliente" ? "user" : "assistant") as "user" | "assistant",
+      role: (m.remitente === "cliente" ? "user" : "assistant") as
+        | "user"
+        | "assistant",
       content: m.contenido,
     }));
 
   const botResult = await runBotTurn(history);
 
-  if (botResult.reply) {
-    await sendWhatsAppMessage(telefono, botResult.reply);
+  if (botResult.reply && pbConversationId && pbAccountId) {
+    await sendWhatsAppMessage(pbConversationId, pbAccountId, botResult.reply);
     await pb.collection("messages").create({
       conversation: conversationId,
       remitente: "bot",
@@ -127,7 +152,7 @@ export async function POST(req: NextRequest) {
   // Notificar lead nuevo (best-effort)
   if (esLeadNuevo) {
     await notifyNewLeadToSlack({
-      nombre: event.data.contact_name ?? null,
+      nombre: parsed.nombre ?? null,
       telefono,
       origen: "whatsapp",
       leadId,
