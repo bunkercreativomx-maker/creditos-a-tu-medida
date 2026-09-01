@@ -3,6 +3,7 @@
 import { useState, type ChangeEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { MONTOS_APROXIMADOS } from "@/lib/site-content";
+import { calcularEdad } from "@/lib/edad";
 
 type Status = "idle" | "sending" | "sent" | "error";
 type DocKey = "ine_frente" | "ine_reverso" | "comprobante_domicilio";
@@ -122,6 +123,18 @@ export function ContactForm() {
               value={data.fecha_nacimiento}
               onChange={setField}
               required
+              suffix={
+                data.fecha_nacimiento
+                  ? (() => {
+                      const edad = calcularEdad(data.fecha_nacimiento);
+                      return edad !== null ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-gold-100 px-2.5 py-1 text-xs font-semibold text-navy-900">
+                          {edad} años
+                        </span>
+                      ) : null;
+                    })()
+                  : null
+              }
             />
             <div className="sm:col-span-2">
               <NavButtons onNext={() => setStep(2)} nextDisabled={!canAdvance(REQUIRED_PERSONAL)} />
@@ -267,6 +280,7 @@ function Field({
   maxLength,
   value,
   onChange,
+  suffix,
 }: {
   label: string;
   name: string;
@@ -276,20 +290,24 @@ function Field({
   maxLength?: number;
   value?: string;
   onChange: (name: string, value: string) => void;
+  suffix?: React.ReactNode;
 }) {
   return (
     <label>
       <span className="mb-1.5 block text-sm font-medium text-navy-900">{label}</span>
-      <input
-        name={name}
-        type={type}
-        required={required}
-        placeholder={placeholder}
-        maxLength={maxLength}
-        value={value ?? ""}
-        onChange={(e) => onChange(name, e.target.value)}
-        className="w-full rounded-xl border border-navy-900/12 bg-cream-50 px-3.5 py-2.5 text-sm text-navy-900 outline-none transition-all focus:border-gold-500 focus:bg-white focus:ring-4 focus:ring-gold-500/15"
-      />
+      <div className="flex items-center gap-2">
+        <input
+          name={name}
+          type={type}
+          required={required}
+          placeholder={placeholder}
+          maxLength={maxLength}
+          value={value ?? ""}
+          onChange={(e) => onChange(name, e.target.value)}
+          className="w-full rounded-xl border border-navy-900/12 bg-cream-50 px-3.5 py-2.5 text-sm text-navy-900 outline-none transition-all focus:border-gold-500 focus:bg-white focus:ring-4 focus:ring-gold-500/15"
+        />
+        {suffix}
+      </div>
     </label>
   );
 }
