@@ -73,7 +73,7 @@ export function Hero() {
               href={WHATSAPP_LINK}
               target="_blank"
               rel="noopener noreferrer"
-              className="group inline-flex items-center gap-2.5 rounded-full bg-gold-500 px-7 py-3.5 text-base font-semibold text-navy-950 shadow-[0_8px_30px_-4px_rgba(201,162,39,0.45)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-gold-400 hover:shadow-[0_12px_40px_-4px_rgba(201,162,39,0.6)]"
+              className="group inline-flex items-center gap-2.5 rounded-full bg-[#25D366] px-7 py-3.5 text-base font-semibold text-white shadow-[0_8px_30px_-4px_rgba(37,211,102,0.5)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#1ebe5b] hover:shadow-[0_12px_40px_-4px_rgba(37,211,102,0.65)]"
             >
               <WhatsAppIcon className="h-5 w-5" />
               Solicita por WhatsApp

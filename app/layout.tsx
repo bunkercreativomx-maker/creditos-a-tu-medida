@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Fraunces, Manrope } from "next/font/google";
 import "./globals.css";
+import { FloatingWhatsApp } from "@/components/site/FloatingWhatsApp";
 
 const fraunces = Fraunces({
   variable: "--font-display",
@@ -34,7 +35,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="es" className={`${fraunces.variable} ${manrope.variable} h-full antialiased`}>
-      <body className="flex min-h-full flex-col bg-cream-50 font-sans text-ink-900">{children}</body>
+      <body className="flex min-h-full flex-col bg-cream-50 font-sans text-ink-900">
+        {children}
+        <FloatingWhatsApp />
+      </body>
     </html>
   );
 }

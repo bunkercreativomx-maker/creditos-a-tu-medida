@@ -47,7 +47,7 @@ export function Sectores() {
             href={WHATSAPP_LINK}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-7 inline-flex items-center gap-2 rounded-full bg-gold-500 px-6 py-2.5 text-sm font-semibold text-navy-950 transition-colors hover:bg-gold-400"
+            className="mt-7 inline-flex items-center gap-2 rounded-full bg-[#25D366] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#1ebe5b]"
           >
             <WhatsAppIcon className="h-4 w-4" />
             Solicita por WhatsApp

@@ -49,7 +49,7 @@ export function Header() {
           href={WHATSAPP_LINK}
           target="_blank"
           rel="noopener noreferrer"
-          className="group flex items-center gap-2 rounded-full bg-gold-500 px-4 py-2 text-sm font-semibold text-navy-950 shadow-[0_0_0_0_rgba(201,162,39,0.4)] transition-all hover:bg-gold-400 hover:shadow-[0_0_24px_2px_rgba(201,162,39,0.35)]"
+          className="group flex items-center gap-2 rounded-full bg-[#25D366] px-4 py-2 text-sm font-semibold text-white shadow-[0_0_0_0_rgba(37,211,102,0.4)] transition-all hover:bg-[#1ebe5b] hover:shadow-[0_0_24px_2px_rgba(37,211,102,0.4)]"
         >
           <WhatsAppIcon className="h-4 w-4" />
           Escríbenos

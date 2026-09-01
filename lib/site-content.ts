@@ -1,12 +1,12 @@
-// TODO: reemplazar por el número real de WhatsApp Business conectado en Zernio.
-export const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "5215500000000";
+// Número de WhatsApp Business (formato internacional 52 + 10 dígitos).
+export const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "526563748899";
 export const WHATSAPP_LINK = `https://wa.me/${WHATSAPP_NUMBER}`;
 
 export const SITE = {
   brand: "Créditos a tu medida",
   financiera: "Financiera Fortaleza, S.A. de C.V., SOFOM, E.N.R.",
-  telefono: "55 4744 0494",
-  direccion: "Sierra Gamón 120, Piso 7, Int. 701 y 702, Col. Lomas de Chapultepec 1ra Sección, Ciudad de México",
+  telefono: "656 374 8899",
+  direccion: "Benjamin Franklin 3220, Int 22-D, Zona Pronaf 32315, Ciudad Juárez, Chihuahua",
   horario: "Lunes a Viernes: 9:00 am – 6:00 pm",
 };
 

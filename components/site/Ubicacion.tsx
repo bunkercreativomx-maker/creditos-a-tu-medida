@@ -28,9 +28,9 @@ export function Ubicacion() {
                 href={WHATSAPP_LINK}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-2 inline-flex items-center gap-2 font-medium text-navy-900 hover:text-gold-600"
+                className="mt-2 inline-flex items-center gap-2 rounded-full bg-[#25D366] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#1ebe5b]"
               >
-                <WhatsAppIcon className="h-4 w-4 text-gold-600" />
+                <WhatsAppIcon className="h-4 w-4" />
                 Escríbenos por WhatsApp
               </a>
             </div>
