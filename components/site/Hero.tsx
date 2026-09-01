@@ -51,7 +51,7 @@ export function Hero() {
             transition={{ duration: 0.7, delay: 0.08, ease }}
             className="max-w-xl font-display text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl"
           >
-            Tu crédito aprobado <br />
+            Tu crédito aprobado y depositado <br />
             <span className="italic text-gold-300">el mismo día</span>
           </motion.h1>
 
@@ -77,10 +77,10 @@ export function Hero() {
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.22, ease }}
-            className="max-w-md text-xs leading-relaxed text-cream-50/55"
+            className="max-w-md text-sm leading-relaxed text-cream-50/75"
           >
             Solicita antes de las 3:00 pm y recibe tu crédito el mismo día. Después de esa hora,
-            tu crédito se aprueba al día siguiente.
+            tu crédito se deposita al día siguiente.
           </motion.p>
 
           <motion.div
