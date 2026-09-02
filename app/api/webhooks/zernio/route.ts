@@ -109,6 +109,7 @@ export async function POST(req: NextRequest) {
     conversation: conversationId,
     remitente: "cliente",
     contenido: texto,
+    created: new Date().toISOString(),
   });
 
   if (!botActivo) {
@@ -155,9 +156,10 @@ export async function POST(req: NextRequest) {
   if (botResult.reply && pbConversationId && pbAccountId) {
     await sendWhatsAppMessage(pbConversationId, pbAccountId, botResult.reply);
     await pb.collection("messages").create({
-      conversation: conversationId,
-      remitente: "bot",
-      contenido: botResult.reply,
+          conversation: conversationId,
+          remitente: "bot",
+          contenido: botResult.reply,
+          created: new Date().toISOString(),
     });
   }
 

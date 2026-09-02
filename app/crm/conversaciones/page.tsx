@@ -15,7 +15,7 @@ type MsgForClient = {
   conversation: string;
   remitente: MensajeRemitente;
   contenido: string;
-  created: string;
+  created?: string | null;
 };
 
 export default async function ConversationsPage() {

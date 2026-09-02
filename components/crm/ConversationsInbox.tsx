@@ -19,7 +19,7 @@ type MessageItem = {
   conversation: string;
   remitente: MensajeRemitente;
   contenido: string;
-  created: string;
+  created?: string | null;
 };
 
 const REMITENTE_LABEL: Record<MensajeRemitente, string> = {
@@ -28,14 +28,14 @@ const REMITENTE_LABEL: Record<MensajeRemitente, string> = {
   asesor: "👤 Tú",
 };
 
-function formatTime(iso: string): string {
+function formatTime(iso: string | null | undefined): string {
   if (!iso) return "";
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "";
   return d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
 }
 
-function formatDay(iso: string): string {
+function formatDay(iso: string | null | undefined): string {
   if (!iso) return "";
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "";
@@ -73,7 +73,7 @@ export function ConversationsInbox({
       .map((c) => ({
         conv: c,
         msgs: (byConv.get(c.id) ?? []).sort((a, b) =>
-          a.id.localeCompare(b.id)
+          (a.created ?? a.id).localeCompare(b.created ?? b.id)
         ),
         last: byConv.get(c.id)?.slice(-1)[0] ?? null,
       }));

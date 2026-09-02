@@ -127,10 +127,11 @@ export async function toggleBotActivo(conversationId: string, botActivo: boolean
 export async function sendAdvisorMessage(conversationId: string, telefono: string, contenido: string) {
   const pb = await createServerClient();
   await pb.collection("messages").create({
-    conversation: conversationId,
-    remitente: "asesor",
-    contenido,
-  });
+      conversation: conversationId,
+      remitente: "asesor",
+      contenido,
+      created: new Date().toISOString(),
+    });
 
   // Leer los ids de Zernio guardados en la conversación para responder al hilo real.
   const conv = await pb
