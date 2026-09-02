@@ -45,6 +45,7 @@ export type PbLead = {
   rfc: string | null;
   nss: string | null;
   institucion: string | null;
+  sector: string | null;
   tipo_credito: TipoCredito | null;
   monto_aproximado: string | null;
   banco: string | null;

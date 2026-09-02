@@ -139,6 +139,19 @@ export async function POST(req: NextRequest) {
 
   const botResult = await runBotTurn(history);
 
+  // Guardar en el lead los datos de calificación que el bot recoja (sector, institución, monto, tipo).
+  if (botResult.leadData) {
+    const updates: Record<string, unknown> = {};
+    if (botResult.leadData.sector) updates.sector = botResult.leadData.sector;
+    if (botResult.leadData.institucion) updates.institucion = botResult.leadData.institucion;
+    if (botResult.leadData.monto_aproximado)
+      updates.monto_aproximado = botResult.leadData.monto_aproximado;
+    if (botResult.leadData.tipo_credito) updates.tipo_credito = botResult.leadData.tipo_credito;
+    if (Object.keys(updates).length > 0) {
+      await pb.collection("leads").update(leadId, updates);
+    }
+  }
+
   if (botResult.reply && pbConversationId && pbAccountId) {
     await sendWhatsAppMessage(pbConversationId, pbAccountId, botResult.reply);
     await pb.collection("messages").create({

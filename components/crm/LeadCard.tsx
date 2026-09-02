@@ -115,6 +115,21 @@ export function LeadCard({
             </span>
           </div>
         )}
+
+        {(lead.sector || lead.institucion) && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {lead.sector && (
+              <span className="inline-block rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-medium capitalize text-blue-700">
+                {lead.sector}
+              </span>
+            )}
+            {lead.institucion && (
+              <span className="inline-block rounded-md bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-700">
+                {lead.institucion}
+              </span>
+            )}
+          </div>
+        )}
       </Link>
 
       <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2">
