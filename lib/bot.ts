@@ -143,8 +143,8 @@ export async function runBotTurn(
     },
     body: JSON.stringify({
       model: DEEPSEEK_MODEL,
-      max_tokens: 1000,
-      temperature: 0.6,
+            max_tokens: 500,
+            temperature: 0.6,
       messages,
       tools: [ESCALAR_TOOL, GUARDAR_DATOS_TOOL],
       tool_choice: "auto",

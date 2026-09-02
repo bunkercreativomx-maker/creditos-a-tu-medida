@@ -135,10 +135,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, bot: "inactivo" });
   }
 
-  // Arma el historial reciente para el bot
-  const recentMessages = await pb
-      .collection("messages")
-      .getList(1, 20, {
+  // Arma el historial reciente para el bot (últimos 10 mensajes: suficiente contexto
+    // sin inflar los tokens de entrada, que es lo que más tarda en DeepSeek).
+    const recentMessages = await pb
+        .collection("messages")
+        .getList(1, 10, {
         filter: `conversation = "${conversationId}"`,
         sort: "created",
       });
