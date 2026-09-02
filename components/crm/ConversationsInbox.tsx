@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { sendAdvisorMessage } from "@/app/crm/actions";
+import { sendAdvisorMessage, claimLead } from "@/app/crm/actions";
 import type { MensajeRemitente } from "@/lib/types";
 
 type ConversationItem = {
@@ -11,7 +11,14 @@ type ConversationItem = {
   canal: string | null;
   bot_activo: boolean;
   updated: string;
-  expand?: { lead?: { id?: string; nombre?: string | null; apellido?: string | null } | null };
+  expand?: {
+    lead?: {
+      id?: string;
+      nombre?: string | null;
+      apellido?: string | null;
+      asignado_a?: string | null;
+    } | null;
+  };
 };
 
 type MessageItem = {
@@ -52,13 +59,38 @@ function formatDay(iso: string | null | undefined): string {
 export function ConversationsInbox({
   conversations,
   messages,
+  vendedores = [],
+  currentUser = null,
 }: {
   conversations: ConversationItem[];
   messages: MessageItem[];
+  vendedores?: { id: string; name: string }[];
+  currentUser?: { id: string; name: string } | null;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const selId = searchParams.get("conversacion");
+  const [claimingId, setClaimingId] = useState<string | null>(null);
+
+  const nombreAsignado = (id: string | null | undefined) => {
+    if (!id) return null;
+    const v = vendedores.find((x) => x.id === id);
+    return v?.name ?? null;
+  };
+
+  const esMio = (c: ConversationItem) =>
+    !!c.expand?.lead?.asignado_a && c.expand?.lead?.asignado_a === currentUser?.id;
+
+  async function tomar(leadId: string) {
+    if (!leadId) return;
+    setClaimingId(leadId);
+    try {
+      await claimLead(leadId);
+      router.refresh();
+    } finally {
+      setClaimingId(null);
+    }
+  }
 
   // Conversaciones con mensajes, ordenadas por la última actividad.
   const sorted = useMemo(() => {
@@ -136,6 +168,32 @@ export function ConversationsInbox({
                       {conv.bot_activo ? "Bot ON" : "Manual"}
                     </span>
                   </p>
+                  <div className="mt-1 flex items-center justify-between">
+                    <span className="flex items-center gap-1 text-[11px] text-slate-400">
+                      {conv.expand?.lead?.asignado_a ? (
+                        <>
+                          <span className="inline-block h-4 w-4 rounded-full bg-blue-100 text-center text-[9px] leading-4">
+                            👤
+                          </span>
+                          {esMio(conv) ? "Tú" : nombreAsignado(conv.expand.lead.asignado_a) ?? "Asignado"}
+                        </>
+                      ) : (
+                        <span className="text-slate-300">Sin asignar</span>
+                      )}
+                    </span>
+                    {!conv.expand?.lead?.asignado_a && conv.expand?.lead?.id && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          tomar(conv.expand!.lead!.id!);
+                        }}
+                        disabled={claimingId === conv.expand?.lead?.id}
+                        className="rounded-md bg-blue-600 px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                      >
+                        Tomar
+                      </button>
+                    )}
+                  </div>
                 </button>
               </li>
             );
@@ -153,6 +211,12 @@ export function ConversationsInbox({
             botActivo={selected.conv.bot_activo}
             nombre={nombreCliente(selected.conv)}
             msgs={selected.msgs}
+            leadId={selected.conv.expand?.lead?.id}
+            asignadoA={selected.conv.expand?.lead?.asignado_a}
+            esMio={esMio(selected.conv)}
+            nombreAsignado={nombreAsignado(selected.conv.expand?.lead?.asignado_a)}
+            onTomar={tomar}
+            claiming={claimingId === selected.conv.expand?.lead?.id}
           />
         ) : (
           <div className="flex flex-1 items-center justify-center text-sm text-slate-400">
@@ -170,12 +234,24 @@ function Thread({
   botActivo,
   nombre,
   msgs,
+  leadId,
+  asignadoA,
+  esMio,
+  nombreAsignado,
+  onTomar,
+  claiming,
 }: {
   conversationId: string;
   telefono: string;
   botActivo: boolean;
   nombre: string;
   msgs: MessageItem[];
+  leadId?: string;
+  asignadoA?: string | null;
+  esMio?: boolean;
+  nombreAsignado?: string | null;
+  onTomar?: (leadId: string) => void;
+  claiming?: boolean;
 }) {
   const router = useRouter();
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -207,16 +283,43 @@ function Thread({
 
   return (
     <>
-      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-        <div>
-          <h3 className="text-sm font-bold text-slate-800">{nombre}</h3>
+      <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
+        <div className="min-w-0">
+          <h3 className="truncate text-sm font-bold text-slate-800">{nombre}</h3>
           <p className="text-xs text-slate-400">{telefono}</p>
+          <p className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-400">
+            {asignadoA ? (
+              <>
+                <span className="inline-block h-4 w-4 rounded-full bg-blue-100 text-center text-[9px] leading-4">
+                  👤
+                </span>
+                {esMio ? (
+                  <span className="font-semibold text-blue-700">Tú la tienes</span>
+                ) : (
+                  <span>La tiene {nombreAsignado ?? "Asignado"}</span>
+                )}
+              </>
+            ) : (
+              <span className="text-slate-300">Sin asignar</span>
+            )}
+          </p>
         </div>
-        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
-          botActivo ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
-        }`}>
-          Bot IA: {botActivo ? "activo" : "apagado"}
-        </span>
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          {!asignadoA && leadId && onTomar && (
+            <button
+              onClick={() => onTomar(leadId)}
+              disabled={claiming}
+              className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {claiming ? "Tomando..." : "👤 Tomar esta conversación"}
+            </button>
+          )}
+          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+            botActivo ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+          }`}>
+            Bot IA: {botActivo ? "activo" : "apagado"}
+          </span>
+        </div>
       </div>
 
       <div className="flex-1 space-y-2 overflow-y-auto p-4">
