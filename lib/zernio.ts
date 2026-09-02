@@ -52,6 +52,23 @@ export type ParsedInbound = {
   accountId: string | null; // Zernio account id (para responder)
 };
 
+/**
+ * Normaliza un número mexicano a 10 dígitos nacionales (sin +52 ni el 1 de movil).
+ * Ej: "+5216564535107" -> "6564535107", "6564535107" -> "6564535107".
+ * El CRM guarda teléfonos nacionales de 10 dígitos; Zernio manda E.164 con prefijo.
+ */
+export function normalizePhone(input: string | null | undefined): string | null {
+  if (!input) return null;
+  const digits = input.replace(/\D/g, "");
+  // Si es internacional mexicano (+52...), recorta a los 10 dígitos nacionales.
+  if (digits.startsWith("52") && digits.length > 10) {
+    return digits.slice(-10);
+  }
+  // Cualquier otra cosa: intenta tomar los últimos 10 dígitos si es un número de tel
+  if (digits.length > 10) return digits.slice(-10);
+  return digits.length >= 10 ? digits : digits || null;
+}
+
 const pick = (o: Record<string, unknown> | undefined, keys: string[]): unknown => {
   if (!o) return undefined;
   for (const k of keys) {

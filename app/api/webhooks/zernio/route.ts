@@ -3,6 +3,7 @@ import {
   verifyZernioSignature,
   sendWhatsAppMessage,
   parseInboundMessage,
+  normalizePhone,
   type ZernioInboundEvent,
 } from "@/lib/zernio";
 import { runBotTurn } from "@/lib/bot";
@@ -37,7 +38,8 @@ export async function POST(req: NextRequest) {
   }
 
   const parsed = parseInboundMessage(event);
-  const telefono = parsed.telefono;
+  const telefonoRaw = parsed.telefono;
+  const telefono = normalizePhone(telefonoRaw);
   const texto = parsed.text;
   if (!telefono || !texto) {
     return NextResponse.json({ ok: true, ignored: "payload incompleto" });
@@ -56,6 +58,13 @@ export async function POST(req: NextRequest) {
   let esLeadNuevo = false;
   if (existingLead) {
     leadId = existingLead.id;
+    // Si el lead existente no tiene nombre y ahora lo sabemos, lo rellenamos.
+    const nombreExistente = existingLead.nombre;
+    if ((!nombreExistente || !String(nombreExistente).trim()) && parsed.nombre) {
+      await pb
+        .collection("leads")
+        .update(leadId, { nombre: parsed.nombre });
+    }
   } else {
     const newLead = await pb.collection("leads").create({
       telefono,
