@@ -9,6 +9,7 @@ import { PushNotifier } from "@/components/crm/PushNotifier";
 const TABS = [
   { href: "/crm", label: "Dashboard", icon: "📊" },
   { href: "/crm/pipeline", label: "Pipeline", icon: "🗂️" },
+  { href: "/crm/conversaciones", label: "Conversaciones", icon: "💬" },
   { href: "/crm/financieras", label: "Financieras", icon: "🏦" },
   { href: "/crm/comisiones", label: "Comisiones", icon: "💰" },
   { href: "/crm/renovaciones", label: "Renovaciones", icon: "🔔" },
