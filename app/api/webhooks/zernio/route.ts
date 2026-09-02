@@ -9,6 +9,7 @@ import {
 import { runBotTurn } from "@/lib/bot";
 import { createAdminClient } from "@/lib/pocketbase-admin";
 import { notifyNewLeadToSlack } from "@/lib/slack-notify";
+import { notifyNewLead } from "@/lib/push";
 
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
@@ -190,6 +191,12 @@ export async function POST(req: NextRequest) {
       telefono,
       origen: "whatsapp",
       leadId,
+    });
+    // Push al PWA del teléfono (mismo aviso que el formulario web).
+    await notifyNewLead({
+      nombre: parsed.nombre ?? null,
+      apellido: null,
+      monto_aproximado: null,
     });
   }
 
