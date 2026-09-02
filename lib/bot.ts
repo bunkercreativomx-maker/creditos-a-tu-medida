@@ -21,15 +21,24 @@ Créditos vía nómina para: Pensionados, Jubilados, Gobierno y Educación (trab
 2. Comprobante de ingresos.
 3. Comprobante de domicilio.
 
+## Flujo de la conversación (sé natural, no un cuestionario)
+1. Saluda con calidez y pregunta el nombre completo: "¿Con quién tengo el gusto?" o "¿Me compartes tu nombre completo?". Espera a que lo diga antes de seguir.
+2. Cuando te dé el nombre, agradécelo y pregunta UNA sola cosa a la vez, en orden natural, sin soltar todas las preguntas juntas:
+   - El monto aproximado que necesita ("¿Qué cantidad andas buscando?").
+   - Si es pensionado o jubilado (o de gobierno/educación) y con qué institución o banco cobra su pensión/nómina.
+   - Si tiene a la mano su Número de Seguro Social (NSS) para poder cotizarle cuánto le tocaría de préstamo.
+3. Ve registrando cada dato con la herramienta guardar_datos_lead conforme el cliente lo vaya compartiendo, aunque aparezcan por separado. No repitas preguntas ya respondidas.
+4. No hagas todas las preguntas de golpe: una a la vez, como en una plática. Si el cliente se desvía, retoma con naturalidad.
+
 ## Tu objetivo en la conversación
 1. Resolver dudas generales sobre el producto y el proceso con la información de arriba.
-2. Calificar al lead: a qué sector pertenece (pensionado/jubilado/gobierno/educación), monto aproximado que busca, e institución con la que tiene convenio. Cuando el cliente te dé alguno de estos datos (sector, monto aproximado o institución), usa la herramienta guardar_datos_lead para registrarlo.
+2. Calificar al lead: nombre completo, monto aproximado, sector (pensionado/jubilado/gobierno/educación), institución o banco, y NSS. Registra cada dato con guardar_datos_lead conforme el cliente lo comparta.
 3. Cuando el cliente esté listo para avanzar, o pida hablar con una persona, o la conversación se salga de estos temas: indica que te pondrás en contacto o que lo pones en manos de un compañero, y usa la herramienta escalar_a_humano.
 
 ## Reglas duras — nunca las rompas
 - Nunca apruebes, niegues, ni des por hecho un crédito. Solo un asesor tras análisis puede hacerlo.
 - Nunca prometas una tasa de interés, CAT o monto exacto — esa información depende de un análisis individual y la da un asesor.
-- Nunca pidas CURP, número de cuenta bancaria, contraseñas, ni otros datos sensibles por este chat.
+- Nunca pidas CURP, número de cuenta bancaria, contraseñas, ni otros datos sensibles por este chat. El NSS sí es necesario para cotizar, pero nunca pidas contraseñas ni cuentas bancarias.
 - Si el cliente pregunta algo fuera de créditos vía nómina de Financiera Fortaleza, responde brevemente que no puedes ayudar con eso y ofrece que un compañero lo atienda.
 - Sé breve y cálido, como un mensaje de WhatsApp — no párrafos largos.`;
 
@@ -54,10 +63,18 @@ const GUARDAR_DATOS_TOOL = {
   function: {
     name: "guardar_datos_lead",
     description:
-      "Registra en el sistema los datos de calificación que el cliente comparte durante la conversación (sector, institución, monto aproximado, tipo de crédito). Llámala cuando el cliente mencione cualquiera de estos datos, aunque vayan apareciendo por separado.",
+      "Registra en el sistema los datos de calificación que el cliente comparte durante la conversación (nombre, apellido, sector, institución, banco, monto aproximado, NSS, tipo de crédito). Llámala cuando el cliente mencione cualquiera de estos datos, aunque vayan apareciendo por separado.",
     parameters: {
       type: "object",
       properties: {
+        nombre: {
+          type: "string",
+          description: "Nombre del cliente (si lo ha dicho).",
+        },
+        apellido: {
+          type: "string",
+          description: "Apellido(s) del cliente (si los ha dicho).",
+        },
         sector: {
           type: "string",
           enum: ["pensionado", "jubilado", "gobierno", "educacion", "otro"],
@@ -67,9 +84,17 @@ const GUARDAR_DATOS_TOOL = {
           type: "string",
           description: "Institución con la que tiene convenio, p.ej. IMSS, ISSSTE, etc.",
         },
+        banco: {
+          type: "string",
+          description: "Banco donde cobra su pensión o nómina, p.ej. Banorte, BBVA, etc.",
+        },
         monto_aproximado: {
           type: "string",
           description: "Monto aproximado que busca, p.ej. '$50,000'.",
+        },
+        nss: {
+          type: "string",
+          description: "Número de Seguro Social del cliente (si lo ha compartido).",
         },
         tipo_credito: {
           type: "string",
@@ -85,9 +110,13 @@ export type BotTurnResult = {
   escalate: boolean;
   escalateReason?: string;
   leadData?: {
+    nombre?: string | null;
+    apellido?: string | null;
     sector?: string | null;
     institucion?: string | null;
+    banco?: string | null;
     monto_aproximado?: string | null;
+    nss?: string | null;
     tipo_credito?: string | null;
   } | null;
 };
@@ -160,10 +189,14 @@ export async function runBotTurn(
     try {
       const args = JSON.parse(guardarCall.function.arguments);
       leadData = {
+        nombre: typeof args?.nombre === "string" ? args.nombre : null,
+        apellido: typeof args?.apellido === "string" ? args.apellido : null,
         sector: typeof args?.sector === "string" ? args.sector : null,
         institucion: typeof args?.institucion === "string" ? args.institucion : null,
+        banco: typeof args?.banco === "string" ? args.banco : null,
         monto_aproximado:
           typeof args?.monto_aproximado === "string" ? args.monto_aproximado : null,
+        nss: typeof args?.nss === "string" ? args.nss : null,
         tipo_credito: typeof args?.tipo_credito === "string" ? args.tipo_credito : null,
       };
     } catch {
