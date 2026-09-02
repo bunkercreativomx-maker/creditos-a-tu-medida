@@ -73,7 +73,7 @@ export function ConversationsInbox({
       .map((c) => ({
         conv: c,
         msgs: (byConv.get(c.id) ?? []).sort((a, b) =>
-          a.created.localeCompare(b.created)
+          a.id.localeCompare(b.id)
         ),
         last: byConv.get(c.id)?.slice(-1)[0] ?? null,
       }));
