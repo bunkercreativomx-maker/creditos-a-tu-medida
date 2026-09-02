@@ -124,11 +124,11 @@ export async function POST(req: NextRequest) {
 
   // Arma el historial reciente para el bot
   const recentMessages = await pb
-    .collection("messages")
-    .getList(1, 20, {
-      filter: `conversation = "${conversationId}"`,
-      sort: "-id",
-    });
+      .collection("messages")
+      .getList(1, 20, {
+        filter: `conversation = "${conversationId}"`,
+        sort: "created",
+      });
 
   const history = (
     (recentMessages.items ?? []) as unknown as {
