@@ -1,6 +1,6 @@
 /* Service Worker — Créditos a tu medida (PWA + Web Push) */
-const CACHE = "creditos-v1";
-const PRECACHE = ["/", "/crm", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png"];
+const CACHE = "creditos-v2";
+const PRECACHE = ["/", "/crm", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/badge-192.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -54,7 +54,7 @@ self.addEventListener("push", (event) => {
       await self.registration.showNotification(data.title, {
         body: data.body,
         icon: "/icon-192.png",
-        badge: "/icon-192.png",
+        badge: "/badge-192.png",
         data: { url: data.url || "/crm" },
         vibrate: [200, 100, 200],
       });
