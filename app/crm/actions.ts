@@ -101,6 +101,20 @@ export async function claimLead(leadId: string) {
   await pb.collection("leads").update(leadId, { asignado_a: user.id });
   const nombre = user.full_name || user.name || user.email || "";
   await logAudit(pb, leadId, "Lead tomado", `Asignado a ${nombre}`);
+
+  // Si el lead tiene una conversación de WhatsApp activa, al tomarlo el asesor
+  // asume el control y el bot se apaga (para que no siga contestando).
+  try {
+    const convs = await pb.collection("conversations").getFullList({
+      filter: `lead = "${leadId}" && bot_activo = true`,
+    });
+    for (const c of convs) {
+      await pb.collection("conversations").update(c.id, { bot_activo: false });
+    }
+  } catch {
+    // best-effort: si falla, no bloquea el claim
+  }
+
   revalidatePath("/crm");
   revalidatePath(`/crm/leads/${leadId}`);
 }
@@ -138,9 +152,19 @@ export async function sendAdvisorMessage(conversationId: string, telefono: strin
     .collection("conversations")
     .getOne(conversationId)
     .catch(() => null) as unknown as {
+    id?: string;
     zernio_conversation_id?: string;
     zernio_account_id?: string;
   } | null;
+
+  // Cuando el asesor responde dentro del CRM, toma el control: apaga el bot de esa
+  // conversación para que no vuelva a contestar por su cuenta.
+  if (conv?.id) {
+    await pb
+      .collection("conversations")
+      .update(conv.id, { bot_activo: false })
+      .catch(() => null);
+  }
 
   const zc = conv?.zernio_conversation_id;
   const za = conv?.zernio_account_id;
