@@ -26,7 +26,7 @@ export default async function ConversationsPage() {
   try {
     const res = await pb
       .collection("conversations")
-      .getList(1, 200, { sort: "-updated", expand: "lead" });
+      .getList(1, 200, { expand: "lead" });
     convos = (res.items ?? []) as unknown as ConversationWithLead[];
   } catch {
     convos = [];
