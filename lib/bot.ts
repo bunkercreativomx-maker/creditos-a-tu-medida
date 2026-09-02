@@ -135,73 +135,92 @@ export async function runBotTurn(
     ...history.map((m) => ({ role: m.role, content: m.content })),
   ];
 
-  const res = await fetch(`${DEEPSEEK_API_URL}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: DEEPSEEK_MODEL,
-            max_tokens: 500,
-            temperature: 0.6,
-      messages,
-      tools: [ESCALAR_TOOL, GUARDAR_DATOS_TOOL],
-      tool_choice: "auto",
-    }),
-  });
+  const callLLM = async (msgs: Array<Record<string, unknown>>) => {
+    const res = await fetch(`${DEEPSEEK_API_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: DEEPSEEK_MODEL,
+        max_tokens: 500,
+        temperature: 0.6,
+        messages: msgs,
+        tools: [ESCALAR_TOOL, GUARDAR_DATOS_TOOL],
+        tool_choice: "auto",
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`LLM API error ${res.status}: ${body.slice(0, 300)}`);
+    }
+    const data = await res.json();
+    return data?.choices?.[0]?.message;
+  };
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`DeepSeek API error ${res.status}: ${body.slice(0, 300)}`);
-  }
-
-  const data = await res.json();
-  const msg = data?.choices?.[0]?.message;
+  let msg = await callLLM(messages);
 
   let reply: string | null = null;
   let escalate = false;
   let escalateReason: string | undefined;
   let leadData: BotTurnResult["leadData"] = null;
 
-  if (typeof msg?.content === "string" && msg.content.trim()) {
-    reply = msg.content.trim();
-  }
-
   const toolCalls = Array.isArray(msg?.tool_calls) ? msg.tool_calls : [];
-  const escalarCall = toolCalls.find(
-    (tc: { function?: { name?: string } }) => tc?.function?.name === "escalar_a_humano"
-  );
-  const guardarCall = toolCalls.find(
-    (tc: { function?: { name?: string } }) => tc?.function?.name === "guardar_datos_lead"
-  );
 
-  if (escalarCall?.function?.arguments) {
-    try {
-      const args = JSON.parse(escalarCall.function.arguments);
-      escalate = true;
-      escalateReason = typeof args?.motivo === "string" ? args.motivo : undefined;
-    } catch {
-      escalate = true;
+  if (toolCalls.length > 0) {
+    // Ejecuta las tool calls (guardar_datos_lead / escalar_a_humano).
+    const escalarCall = toolCalls.find(
+      (tc: { function?: { name?: string } }) => tc?.function?.name === "escalar_a_humano"
+    );
+    const guardarCall = toolCalls.find(
+      (tc: { function?: { name?: string } }) => tc?.function?.name === "guardar_datos_lead"
+    );
+
+    if (escalarCall?.function?.arguments) {
+      try {
+        const args = JSON.parse(escalarCall.function.arguments);
+        escalate = true;
+        escalateReason = typeof args?.motivo === "string" ? args.motivo : undefined;
+      } catch {
+        escalate = true;
+      }
     }
-  }
 
-  if (guardarCall?.function?.arguments) {
-    try {
-      const args = JSON.parse(guardarCall.function.arguments);
-      leadData = {
-        nombre: typeof args?.nombre === "string" ? args.nombre : null,
-        apellido: typeof args?.apellido === "string" ? args.apellido : null,
-        sector: typeof args?.sector === "string" ? args.sector : null,
-        institucion: typeof args?.institucion === "string" ? args.institucion : null,
-        banco: typeof args?.banco === "string" ? args.banco : null,
-        monto_aproximado:
-          typeof args?.monto_aproximado === "string" ? args.monto_aproximado : null,
-        nss: typeof args?.nss === "string" ? args.nss : null,
-        tipo_credito: typeof args?.tipo_credito === "string" ? args.tipo_credito : null,
-      };
-    } catch {
-      leadData = null;
+    if (guardarCall?.function?.arguments) {
+      try {
+        const args = JSON.parse(guardarCall.function.arguments);
+        leadData = {
+          nombre: typeof args?.nombre === "string" ? args.nombre : null,
+          apellido: typeof args?.apellido === "string" ? args.apellido : null,
+          sector: typeof args?.sector === "string" ? args.sector : null,
+          institucion: typeof args?.institucion === "string" ? args.institucion : null,
+          banco: typeof args?.banco === "string" ? args.banco : null,
+          monto_aproximado:
+            typeof args?.monto_aproximado === "string" ? args.monto_aproximado : null,
+          nss: typeof args?.nss === "string" ? args.nss : null,
+          tipo_credito: typeof args?.tipo_credito === "string" ? args.tipo_credito : null,
+        };
+      } catch {
+        leadData = null;
+      }
+    }
+
+    // CRITICO: Gemini devuelve SOLO la tool call sin texto. Hay que hacer una
+    // segunda llamada con el resultado de la tool para obtener la respuesta final
+    // en texto; si no, el bot se queda mudo (persiste el mensaje pero no responde).
+    const toolResults = toolCalls.map((tc: { id?: string }) => ({
+      role: "tool",
+      tool_call_id: tc?.id,
+      content: JSON.stringify({ ok: true }),
+    }));
+    const msg2 = await callLLM([...messages, msg, ...toolResults]);
+    if (typeof msg2?.content === "string" && msg2.content.trim()) {
+      reply = msg2.content.trim();
+    }
+  } else {
+    if (typeof msg?.content === "string" && msg.content.trim()) {
+      reply = msg.content.trim();
     }
   }
 
