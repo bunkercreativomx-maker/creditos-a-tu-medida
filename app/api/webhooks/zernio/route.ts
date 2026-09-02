@@ -4,6 +4,7 @@ import {
   sendWhatsAppMessage,
   parseInboundMessage,
   normalizePhone,
+  isValidMexicanMobile,
   type ZernioInboundEvent,
 } from "@/lib/zernio";
 import { runBotTurn } from "@/lib/bot";
@@ -45,6 +46,11 @@ export async function POST(req: NextRequest) {
   const parsed = parseInboundMessage(event);
     const telefonoRaw = parsed.telefono;
     const telefono = normalizePhone(telefonoRaw);
+  // Filtra spam/escáner: rechaza números que no sean un móvil mexicano válido
+  // (10 dígitos, código de área 2-9). No crea lead ni corre el bot.
+  if (!isValidMexicanMobile(telefono)) {
+    return NextResponse.json({ ok: true, ignored: "telefono invalido" });
+  }
     const texto = parsed.text;
       const attachments = parsed.attachments ?? [];
       // Acepta mensajes con adjunto aunque no traigan texto (ej. foto del INE sin caption).

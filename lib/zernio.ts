@@ -70,6 +70,17 @@ export function normalizePhone(input: string | null | undefined): string | null 
   return digits.length >= 10 ? digits : digits || null;
 }
 
+/**
+ * Valida que un número normalizado sea un móvil mexicano plausible.
+ * Los números nacionales de México son 10 dígitos y el código de área (primer
+ * dígito) va de 2 a 9 — nunca 0 ni 1. Esto filtra bots de spam/escáner que
+ * mandan mensajes desde números inválidos (ej. 0245580093).
+ */
+export function isValidMexicanMobile(phone: string | null | undefined): boolean {
+  if (!phone) return false;
+  return /^[2-9]\d{9}$/.test(phone);
+}
+
 const pick = (o: Record<string, unknown> | undefined, keys: string[]): unknown => {
   if (!o) return undefined;
   for (const k of keys) {
