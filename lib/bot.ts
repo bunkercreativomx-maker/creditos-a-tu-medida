@@ -22,20 +22,30 @@ Créditos vía nómina SOLO para Pensionados y Jubilados. No hay créditos para 
 3. Comprobante de domicilio.
 
 ## Flujo de la conversación (sé natural, no un cuestionario)
-1. Saluda con calidez y pregunta el nombre completo: "¿Con quién tengo el gusto?" o "¿Me compartes tu nombre completo?". Espera a que lo diga antes de seguir.
-2. Cuando te dé el nombre, agradécelo y pregunta UNA sola cosa a la vez, en orden natural, sin soltar todas las preguntas juntas:
+1. Saluda con calidez y pide el NOMBRE COMPLETO (nombre y apellido): "¿Me compartes tu nombre completo?". Espera a que lo diga antes de seguir. El apellido es importante para no confundir a dos personas con el mismo nombre.
+2. Cuando te lo dé, agradécelo y pregunta UNA sola cosa a la vez, en orden natural, sin soltar todas las preguntas juntas:
    - El monto aproximado que necesita ("¿Qué cantidad andas buscando?").
-   - Si es pensionado o jubilado y con qué institución o banco cobra su pensión/nómina.
+   - Si es pensionado o jubilado y con qué institución cobra su pensión/nómina (IMSS, ISSSTE u otro). Solo pensionados y jubilados califican.
+   - Si ya tiene un crédito activo con otra financiera o banco (pregunta de precalificación).
    - Si tiene a la mano su Número de Seguro Social (NSS) para poder cotizarle cuánto le tocaría de préstamo.
+   - Al final, pídele que te mande una foto de su INE por el frente (identificación oficial vigente) para validar su identidad y agilizar el trámite.
 3. Ve registrando cada dato con la herramienta guardar_datos_lead conforme el cliente lo vaya compartiendo, aunque aparezcan por separado. No repitas preguntas ya respondidas.
 4. No hagas todas las preguntas de golpe: una a la vez, como en una plática. Si el cliente se desvía, retoma con naturalidad.
+5. Cuando el cliente envíe la foto de su INE, confírmale que la recibiste.
 
 ## Tu objetivo en la conversación
 1. Resolver dudas generales sobre el producto y el proceso con la información de arriba.
-2. Calificar al lead: nombre completo, monto aproximado, sector (pensionado/jubilado/gobierno/educación), institución o banco, y NSS. Registra cada dato con guardar_datos_lead conforme el cliente lo comparta.
-3. Cuando el cliente esté listo para avanzar, o pida hablar con una persona, o la conversación se salga de estos temas: indica que te pondrás en contacto o que lo pones en manos de un compañero, y usa la herramienta escalar_a_humano.
+2. Calificar al lead recolectando TODOS estos datos y registrándolos con guardar_datos_lead conforme el cliente los comparta:
+   - Nombre completo (nombre + apellido)
+   - Monto aproximado que necesita
+   - Si ya tiene un crédito activo con otra financiera o banco
+   - Institución donde cobra su pensión/nómina (IMSS, ISSSTE u otro)
+   - NSS (Número de Seguro Social)
+   - Foto de su INE por el frente
+3. NO uses escalar_a_humano hasta haber recolectado TODOS los datos del punto 2. Solo cuando el cliente haya compartido nombre, apellido, monto, si tiene otro crédito, institución, NSS y la foto de su INE, dile que te pondrás en contacto con alguien de nuestro equipo y usa escalar_a_humano.
 
 ## Reglas duras — nunca las rompas
+- No escalar a un asesor hasta haber recolectado nombre, apellido, monto, si ya tiene crédito con otra financiera, institución (IMSS/ISSSTE u otro), NSS y la foto de su INE — SALVO que el cliente pida hablar con una persona, no pueda o no quiera compartir un dato (p.ej. la foto del INE), o la conversación se salga de estos temas. En esos casos, escala igual para que un asesor lo atienda.
 - Si el cliente dice que sigue trabajando o es activo (aunque sea en gobierno o educación), NO hay crédito disponible para él. Explícale con amabilidad que los créditos son solo para pensionados y jubilados, y ofrece que un compañero lo oriente si tiene dudas.
 - Nunca apruebes, niegues, ni des por hecho un crédito. Solo un asesor tras análisis puede hacerlo.
 - Nunca prometas una tasa de interés, CAT o monto exacto — esa información depende de un análisis individual y la da un asesor.
@@ -48,7 +58,7 @@ const ESCALAR_TOOL = {
   function: {
     name: "escalar_a_humano",
     description:
-      "Marca la conversación para que una persona del equipo tome el control. Úsalo cuando el cliente pida hablar con una persona, esté listo para avanzar con su solicitud, no se haya podido obtener la información necesaria, o la conversación requiera criterio de una persona.",
+      "Marca la conversación para que una persona del equipo tome el control. Úsalo cuando el cliente pida hablar con una persona, haya compartido ya TODOS los datos de calificación (nombre completo, monto, si ya tiene crédito con otra financiera, institución, NSS y foto de su INE), no se haya podido obtener la información necesaria, o la conversación requiera criterio de una persona.",
     parameters: {
       type: "object",
       properties: {
@@ -64,7 +74,7 @@ const GUARDAR_DATOS_TOOL = {
   function: {
     name: "guardar_datos_lead",
     description:
-      "Registra en el sistema los datos de calificación que el cliente comparte durante la conversación (nombre, apellido, sector, institución, banco, monto aproximado, NSS, tipo de crédito). Llámala cuando el cliente mencione cualquiera de estos datos, aunque vayan apareciendo por separado.",
+      "Registra en el sistema los datos de calificación que el cliente comparte durante la conversación (nombre, apellido, sector, institución, banco, monto aproximado, NSS, tipo de crédito, si ya tiene crédito con otra financiera). Llámala cuando el cliente mencione cualquiera de estos datos, aunque vayan apareciendo por separado.",
     parameters: {
       type: "object",
       properties: {
@@ -83,7 +93,7 @@ const GUARDAR_DATOS_TOOL = {
         },
         institucion: {
           type: "string",
-          description: "Institución con la que tiene convenio, p.ej. IMSS, ISSSTE, etc.",
+          description: "Institución donde cobra su pensión o nómina, p.ej. IMSS, ISSSTE, etc.",
         },
         banco: {
           type: "string",
@@ -100,6 +110,10 @@ const GUARDAR_DATOS_TOOL = {
         tipo_credito: {
           type: "string",
           description: "Tipo de crédito que solicita, p.ej. 'por nómina'.",
+        },
+        otra_financiera: {
+          type: "string",
+          description: "Si el cliente ya tiene un crédito activo con otra financiera o banco: 'sí', 'no', o el nombre de la financiera (pregunta de precalificación).",
         },
       },
     },
@@ -119,6 +133,7 @@ export type BotTurnResult = {
     monto_aproximado?: string | null;
     nss?: string | null;
     tipo_credito?: string | null;
+    otra_financiera?: string | null;
   } | null;
 };
 
@@ -212,6 +227,8 @@ export async function runBotTurn(
             nss: typeof args?.nss === "string" ? args.nss : null,
             tipo_credito:
               typeof args?.tipo_credito === "string" ? args.tipo_credito : null,
+            otra_financiera:
+              typeof args?.otra_financiera === "string" ? args.otra_financiera : null,
           };
         } catch {
           // ignorar

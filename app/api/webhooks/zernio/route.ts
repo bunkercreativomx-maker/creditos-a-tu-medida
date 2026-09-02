@@ -10,7 +10,7 @@ import {
 import { runBotTurn } from "@/lib/bot";
 import { createAdminClient } from "@/lib/pocketbase-admin";
 import { notifyNewLeadToSlack } from "@/lib/slack-notify";
-import { notifyNewLead } from "@/lib/push";
+import { notifyNewLead, notifyNeedsAdvisor } from "@/lib/push";
 
 // DeepSeek puede tardar varios segundos; evita que Vercel corte la función
 // antes de enviar la respuesta del bot (default ~10-15s).
@@ -154,6 +154,7 @@ export async function POST(req: NextRequest) {
     (recentMessages.items ?? []) as unknown as {
       remitente: string;
       contenido: string;
+      media_type?: string | null;
     }[]
   )
     .filter((m) => m.remitente !== "asesor")
@@ -161,7 +162,9 @@ export async function POST(req: NextRequest) {
       role: (m.remitente === "cliente" ? "user" : "assistant") as
         | "user"
         | "assistant",
-      content: m.contenido,
+      content: m.media_type
+        ? `[El cliente envió una ${m.media_type === "image" ? "foto" : "imagen"}${m.contenido ? ` con el mensaje: ${m.contenido}` : ""}]`
+        : m.contenido,
     }));
 
   const botResult = await runBotTurn(history);
@@ -178,6 +181,7 @@ export async function POST(req: NextRequest) {
         updates.monto_aproximado = botResult.leadData.monto_aproximado;
       if (botResult.leadData.nss) updates.nss = botResult.leadData.nss;
       if (botResult.leadData.tipo_credito) updates.tipo_credito = botResult.leadData.tipo_credito;
+      if (botResult.leadData.otra_financiera) updates.otra_financiera = botResult.leadData.otra_financiera;
       if (Object.keys(updates).length > 0) {
         await pb.collection("leads").update(leadId, updates);
       }
@@ -196,8 +200,10 @@ export async function POST(req: NextRequest) {
   if (botResult.escalate) {
     await pb
       .collection("conversations")
-      .update(conversationId, { bot_activo: false });
+      .update(conversationId, { bot_activo: false, necesita_asesor: true });
     await pb.collection("leads").update(leadId, { status: "en_seguimiento" });
+    // Notifica a los asesores que esta conversación ya está lista y requiere su atención.
+    await notifyNeedsAdvisor(leadId);
   }
 
   // Notificar lead nuevo (best-effort)

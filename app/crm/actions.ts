@@ -109,7 +109,7 @@ export async function claimLead(leadId: string) {
       filter: `lead = "${leadId}" && bot_activo = true`,
     });
     for (const c of convs) {
-      await pb.collection("conversations").update(c.id, { bot_activo: false });
+      await pb.collection("conversations").update(c.id, { bot_activo: false, necesita_asesor: false });
     }
   } catch {
     // best-effort: si falla, no bloquea el claim
@@ -158,11 +158,11 @@ export async function sendAdvisorMessage(conversationId: string, telefono: strin
   } | null;
 
   // Cuando el asesor responde dentro del CRM, toma el control: apaga el bot de esa
-  // conversación para que no vuelva a contestar por su cuenta.
+  // conversación y quita el aviso de "necesita asesor" (ya la está atendiendo).
   if (conv?.id) {
     await pb
       .collection("conversations")
-      .update(conv.id, { bot_activo: false })
+      .update(conv.id, { bot_activo: false, necesita_asesor: false })
       .catch(() => null);
   }
 

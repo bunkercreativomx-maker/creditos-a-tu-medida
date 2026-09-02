@@ -40,6 +40,17 @@ export default async function CrmLayout({ children }: { children: React.ReactNod
     leadsNuevosHoy = 0;
   }
 
+  // Conversaciones que el bot ya calificó y esperan la atención de un asesor.
+  let conversacionesParaAsesor = 0;
+  try {
+    const res = await pb
+      .collection("conversations")
+      .getList(1, 1, { filter: `necesita_asesor = true` });
+    conversacionesParaAsesor = res.totalItems;
+  } catch {
+    conversacionesParaAsesor = 0;
+  }
+
   const fullName = (user as { full_name?: string }).full_name
     ?? (user as { name?: string }).name
     ?? user.email
@@ -47,7 +58,12 @@ export default async function CrmLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
-      <CrmNav fullName={fullName} role={user.role ?? "asesor"} leadsNuevosHoy={leadsNuevosHoy} />
+      <CrmNav
+        fullName={fullName}
+        role={user.role ?? "asesor"}
+        leadsNuevosHoy={leadsNuevosHoy}
+        conversacionesParaAsesor={conversacionesParaAsesor}
+      />
       <main className="flex-1 px-4 py-6 sm:px-6">{children}</main>
     </div>
   );

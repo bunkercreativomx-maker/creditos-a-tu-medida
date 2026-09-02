@@ -17,7 +17,7 @@ const TABS = [
   { href: "/crm/vendedores", label: "Vendedores", icon: "👥" },
 ];
 
-export function CrmNav({ fullName, role, leadsNuevosHoy }: { fullName: string; role: string; leadsNuevosHoy?: number }) {
+export function CrmNav({ fullName, role, leadsNuevosHoy, conversacionesParaAsesor }: { fullName: string; role: string; leadsNuevosHoy?: number; conversacionesParaAsesor?: number }) {
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -132,6 +132,29 @@ export function CrmNav({ fullName, role, leadsNuevosHoy }: { fullName: string; r
               </span>
             </div>
           </nav>
+        )}
+
+        {/* Aviso de conversaciones que necesitan asesor */}
+        {typeof conversacionesParaAsesor === "number" && conversacionesParaAsesor > 0 && (
+          <Link
+            href="/crm/conversaciones"
+            onClick={() => setMenuOpen(false)}
+            className="mb-2 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 transition-colors hover:bg-amber-100"
+          >
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-500" />
+            </span>
+            <span className="font-semibold">
+              <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 py-0.5 text-xs font-bold text-white">
+                {conversacionesParaAsesor}
+              </span>{" "}
+              {conversacionesParaAsesor === 1
+                ? "conversación lista y espera a un asesor"
+                : "conversaciones listas y esperan a un asesor"}
+            </span>
+            <span className="ml-auto text-xs text-amber-600">Atender →</span>
+          </Link>
         )}
 
         {/* Aviso de leads nuevos */}

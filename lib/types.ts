@@ -72,6 +72,7 @@ export type PbConversation = {
   telefono: string;
   canal: string | null;
   bot_activo: boolean;
+  necesita_asesor?: boolean | null;
   created: string;
   updated: string;
 };

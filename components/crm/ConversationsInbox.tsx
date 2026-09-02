@@ -10,6 +10,7 @@ type ConversationItem = {
   telefono: string;
   canal: string | null;
   bot_activo: boolean;
+  necesita_asesor?: boolean | null;
   updated: string;
   expand?: {
     lead?: {
@@ -109,7 +110,13 @@ export function ConversationsInbox({
         ),
         last: byConv.get(c.id)?.slice(-1)[0] ?? null,
       }));
-    withMsgs.sort((a, b) => (b.last?.created ?? "").localeCompare(a.last?.created ?? ""));
+    withMsgs.sort((a, b) => {
+      // Las que necesitan asesor van primero; luego por última actividad.
+      const na = a.conv.necesita_asesor ? 1 : 0;
+      const nb = b.conv.necesita_asesor ? 1 : 0;
+      if (na !== nb) return nb - na;
+      return (b.last?.created ?? "").localeCompare(a.last?.created ?? "");
+    });
     return withMsgs;
   }, [conversations, messages]);
 
@@ -146,13 +153,18 @@ export function ConversationsInbox({
                     router.refresh();
                   }}
                   className={`w-full border-b border-slate-50 px-4 py-3 text-left hover:bg-slate-50 ${
-                    active ? "bg-blue-50" : ""
+                    active ? "bg-blue-50" : conv.necesita_asesor ? "bg-amber-50" : ""
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="truncate text-sm font-semibold text-slate-800">
                       {nombreCliente(conv)}
                     </span>
+                    {conv.necesita_asesor && (
+                      <span className="ml-2 shrink-0 animate-pulse rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                        ⚠️ Necesita asesor
+                      </span>
+                    )}
                     <span className="shrink-0 text-[11px] text-slate-400">
                       {last ? formatDay(last.created) : ""}
                     </span>
