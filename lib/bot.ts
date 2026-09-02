@@ -159,70 +159,79 @@ export async function runBotTurn(
     return data?.choices?.[0]?.message;
   };
 
-  let msg = await callLLM(messages);
+  let working: Array<Record<string, unknown>> = [...messages];
+  let msg = await callLLM(working);
 
   let reply: string | null = null;
   let escalate = false;
   let escalateReason: string | undefined;
   let leadData: BotTurnResult["leadData"] = null;
 
-  const toolCalls = Array.isArray(msg?.tool_calls) ? msg.tool_calls : [];
+  // Loop iterativo de tool-calling: tras ejecutar una tool, vuelve a llamar al
+  // modelo con el resultado. Gemini (y DeepSeek) pueden necesitar VARIAS tools
+  // en secuencia (ej. guardar_datos_lead y luego escalar_a_humano al completar
+  // los datos); si solo se hace una llamada de seguimiento y esta devuelve otra
+  // tool call sin texto, el bot se queda mudo. Tope de 4 rondas para evitar bucles.
+  for (let round = 0; round < 4; round++) {
+    const toolCalls: Array<{
+      id?: string;
+      function?: { name?: string; arguments?: string };
+    }> = Array.isArray(msg?.tool_calls) ? msg.tool_calls : [];
 
-  if (toolCalls.length > 0) {
-    // Ejecuta las tool calls (guardar_datos_lead / escalar_a_humano).
-    const escalarCall = toolCalls.find(
-      (tc: { function?: { name?: string } }) => tc?.function?.name === "escalar_a_humano"
-    );
-    const guardarCall = toolCalls.find(
-      (tc: { function?: { name?: string } }) => tc?.function?.name === "guardar_datos_lead"
-    );
+    if (toolCalls.length === 0) {
+      // Sin más tools: esta es la respuesta final en texto.
+      if (typeof msg?.content === "string" && msg.content.trim()) {
+        reply = msg.content.trim();
+      }
+      break;
+    }
 
-    if (escalarCall?.function?.arguments) {
-      try {
-        const args = JSON.parse(escalarCall.function.arguments);
+    // Procesa todas las tool calls de esta ronda.
+    for (const tc of toolCalls) {
+      const name = tc?.function?.name;
+      if (name === "escalar_a_humano" && tc?.function?.arguments) {
         escalate = true;
-        escalateReason = typeof args?.motivo === "string" ? args.motivo : undefined;
-      } catch {
-        escalate = true;
+        try {
+          const args = JSON.parse(tc.function.arguments);
+          if (typeof args?.motivo === "string") escalateReason = args.motivo;
+        } catch {
+          // escalado igual
+        }
+      }
+      if (name === "guardar_datos_lead" && tc?.function?.arguments) {
+        try {
+          const args = JSON.parse(tc.function.arguments);
+          leadData = {
+            nombre: typeof args?.nombre === "string" ? args.nombre : null,
+            apellido: typeof args?.apellido === "string" ? args.apellido : null,
+            sector: typeof args?.sector === "string" ? args.sector : null,
+            institucion: typeof args?.institucion === "string" ? args.institucion : null,
+            banco: typeof args?.banco === "string" ? args.banco : null,
+            monto_aproximado:
+              typeof args?.monto_aproximado === "string" ? args.monto_aproximado : null,
+            nss: typeof args?.nss === "string" ? args.nss : null,
+            tipo_credito:
+              typeof args?.tipo_credito === "string" ? args.tipo_credito : null,
+          };
+        } catch {
+          // ignorar
+        }
       }
     }
 
-    if (guardarCall?.function?.arguments) {
-      try {
-        const args = JSON.parse(guardarCall.function.arguments);
-        leadData = {
-          nombre: typeof args?.nombre === "string" ? args.nombre : null,
-          apellido: typeof args?.apellido === "string" ? args.apellido : null,
-          sector: typeof args?.sector === "string" ? args.sector : null,
-          institucion: typeof args?.institucion === "string" ? args.institucion : null,
-          banco: typeof args?.banco === "string" ? args.banco : null,
-          monto_aproximado:
-            typeof args?.monto_aproximado === "string" ? args.monto_aproximado : null,
-          nss: typeof args?.nss === "string" ? args.nss : null,
-          tipo_credito: typeof args?.tipo_credito === "string" ? args.tipo_credito : null,
-        };
-      } catch {
-        leadData = null;
-      }
-    }
-
-    // CRITICO: Gemini devuelve SOLO la tool call sin texto. Hay que hacer una
-    // segunda llamada con el resultado de la tool para obtener la respuesta final
-    // en texto; si no, el bot se queda mudo (persiste el mensaje pero no responde).
-    const toolResults = toolCalls.map((tc: { id?: string }) => ({
-      role: "tool",
-      tool_call_id: tc?.id,
-      content: JSON.stringify({ ok: true }),
-    }));
-    const msg2 = await callLLM([...messages, msg, ...toolResults]);
-    if (typeof msg2?.content === "string" && msg2.content.trim()) {
-      reply = msg2.content.trim();
-    }
-  } else {
-    if (typeof msg?.content === "string" && msg.content.trim()) {
-      reply = msg.content.trim();
-    }
+    // Anexa el mensaje del asistente (con sus tool_calls) y los resultados, y vuelve a llamar.
+    working = [
+      ...working,
+      msg,
+      ...toolCalls.map((tc) => ({
+        role: "tool",
+        tool_call_id: tc?.id,
+        content: JSON.stringify({ ok: true }),
+      })),
+    ];
+    msg = await callLLM(working);
   }
 
+  // Si tras el loop no hay texto (caso extremo), no se manda nada — mejor que un error.
   return { reply, escalate, escalateReason, leadData };
 }
