@@ -51,8 +51,10 @@ self.addEventListener("push", (event) => {
       } catch {
         /* badge no soportado (iOS) */
       }
-      await self.registration.showNotification(data.title, {
-        body: data.body,
+      const title = String(data.title ?? "Nuevo lead");
+      const body = typeof data.body === "string" ? data.body : JSON.stringify(data.body ?? "");
+      await self.registration.showNotification(title, {
+        body,
         icon: "/icon-192.png",
         badge: "/badge-192.png",
         data: { url: data.url || "/crm" },

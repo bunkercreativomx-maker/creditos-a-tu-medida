@@ -98,10 +98,17 @@ export function parseInboundMessage(event: ZernioInboundEvent): ParsedInbound {
     pick(event.data, ["from"]) ??
     (event.data?.sender && (event.data.sender.id ?? null))) as string | null;
 
-  const nombre = (pick(msg, ["senderName", "sender", "name"]) ??
-    pick(conv, ["participantName", "name"]) ??
-    pick(event.data, ["contact_name"]) ??
-    (event.data?.sender && (event.data.sender.name ?? null))) as string | null;
+  const nombreRaw = (pick(msg, ["senderName", "sender", "name"]) ??
+      pick(conv, ["participantName", "name"]) ??
+      pick(event.data, ["contact_name"]) ??
+      (event.data?.sender && (event.data.sender.name ?? null))) as unknown;
+    // `sender` puede ser un objeto { id, name } — normaliza a string.
+    const nombre =
+      typeof nombreRaw === "string"
+        ? nombreRaw
+        : nombreRaw && typeof nombreRaw === "object"
+          ? String((nombreRaw as { name?: unknown }).name ?? "")
+          : (nombreRaw as string | null);
 
   const conversationId = (pick(msg, ["conversationId"]) ??
     pick(conv, ["id", "conversationId"]) ??

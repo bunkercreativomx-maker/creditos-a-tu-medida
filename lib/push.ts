@@ -48,8 +48,16 @@ export async function notifyNewLead(lead: { nombre?: string | null; apellido?: s
     const subs = await pb.collection("push_subscriptions").getFullList();
     if (subs.length === 0) return;
 
-    const nombre = [lead.nombre, lead.apellido].filter(Boolean).join(" ") || "Nuevo lead";
-    const monto = lead.monto_aproximado ? ` · ${lead.monto_aproximado}` : "";
+    const toStr = (v: unknown) =>
+      typeof v === "string"
+        ? v
+        : v && typeof v === "object"
+          ? String((v as { name?: unknown }).name ?? "")
+          : v
+            ? String(v)
+            : "";
+    const nombre = [toStr(lead.nombre), toStr(lead.apellido)].filter(Boolean).join(" ") || "Nuevo lead";
+    const monto = lead.monto_aproximado ? ` · ${toStr(lead.monto_aproximado)}` : "";
     const title = "📩 Nuevo lead";
     const body = `${nombre}${monto}`;
 

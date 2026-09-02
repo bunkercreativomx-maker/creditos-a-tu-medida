@@ -22,8 +22,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const title = body.title ?? "Nuevo lead";
-  const text = body.body ?? "Tienes un nuevo lead en el CRM";
+  const title = typeof body.title === "string" ? body.title : "Nuevo lead";
+  const raw = body.body ?? "Tienes un nuevo lead en el CRM";
+  const text = typeof raw === "string" ? raw : JSON.stringify(raw);
   const url = body.url ?? "/crm";
 
   try {
