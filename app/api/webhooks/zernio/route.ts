@@ -43,14 +43,22 @@ export async function POST(req: NextRequest) {
   }
 
   const parsed = parseInboundMessage(event);
-  const telefonoRaw = parsed.telefono;
-  const telefono = normalizePhone(telefonoRaw);
-  const texto = parsed.text;
-    const attachments = parsed.attachments ?? [];
-    // Acepta mensajes con adjunto aunque no traigan texto (ej. foto del INE sin caption).
-    if (!telefono || (!texto && attachments.length === 0)) {
-      return NextResponse.json({ ok: true, ignored: "payload incompleto" });
-    }
+    const telefonoRaw = parsed.telefono;
+    const telefono = normalizePhone(telefonoRaw);
+    const texto = parsed.text;
+      const attachments = parsed.attachments ?? [];
+      // Acepta mensajes con adjunto aunque no traigan texto (ej. foto del INE sin caption).
+      if (!telefono || (!texto && attachments.length === 0)) {
+        return NextResponse.json({ ok: true, ignored: "payload incompleto" });
+      }
+
+    // Marcar como procesado ANTES del trabajo lento (DeepSeek tarda 10-60s).
+    // Zernio reintenta hasta ~7x; si el marcador se escribe al final, cada reintento
+    // que llega mientras el primero procesa pasa el chequeo de dedupe y responde
+    // duplicado (síntoma: 4 respuestas a un solo mensaje). Escribirlo temprano
+    // descarta los reintentos. Tradeoff: si el proceso muere a mitad, ese mensaje
+    // se pierde (no se reintenta) — aceptable frente a spamear al cliente.
+        await pb.collection("processed_webhook_events").create({ event_id: event.id });
 
   const pbConversationId = parsed.conversationId;
   const pbAccountId = parsed.accountId;
@@ -184,9 +192,6 @@ export async function POST(req: NextRequest) {
       .update(conversationId, { bot_activo: false });
     await pb.collection("leads").update(leadId, { status: "en_seguimiento" });
   }
-
-  // Marcar como procesado SOLO después de éxito (evita perder reintentos)
-  await pb.collection("processed_webhook_events").create({ event_id: event.id });
 
   // Notificar lead nuevo (best-effort)
   if (esLeadNuevo) {
