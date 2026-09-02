@@ -1,6 +1,5 @@
-import Anthropic from "@anthropic-ai/sdk";
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const DEEPSEEK_API_URL = process.env.DEEPSEEK_API_BASE ?? "https://api.deepseek.com";
+const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL ?? "deepseek-chat";
 
 const SYSTEM_PROMPT = `Eres el asistente virtual de WhatsApp de "Créditos a tu medida", promotor de Financiera Fortaleza, S.A. de C.V., SOFOM, E.N.R. — institución financiera 100% mexicana con más de 20 años en el mercado.
 
@@ -30,12 +29,13 @@ Créditos vía nómina para: Pensionados, Jubilados, Gobierno y Educación (trab
 - Si el cliente pregunta algo fuera de créditos vía nómina de Financiera Fortaleza, responde brevemente que no puedes ayudar con eso y ofrece conectarlo con un asesor.
 - Sé breve y cálido, como un mensaje de WhatsApp — no párrafos largos.`;
 
-const tools: Anthropic.Tool[] = [
-  {
+const ESCALAR_TOOL = {
+  type: "function",
+  function: {
     name: "escalar_a_humano",
     description:
       "Marca la conversación para que un asesor humano tome el control. Úsalo cuando el cliente pida hablar con una persona, esté listo para avanzar con su solicitud, o la conversación requiera juicio humano.",
-    input_schema: {
+    parameters: {
       type: "object",
       properties: {
         motivo: { type: "string", description: "Breve razón del escalamiento" },
@@ -43,7 +43,7 @@ const tools: Anthropic.Tool[] = [
       required: ["motivo"],
     },
   },
-];
+};
 
 export type BotTurnResult = {
   reply: string | null;
@@ -54,24 +54,58 @@ export type BotTurnResult = {
 export async function runBotTurn(
   history: { role: "user" | "assistant"; content: string }[]
 ): Promise<BotTurnResult> {
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-5",
-    max_tokens: 600,
-    system: SYSTEM_PROMPT,
-    tools,
-    messages: history.map((m) => ({ role: m.role, content: m.content })),
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  if (!apiKey) {
+    throw new Error("Falta DEEPSEEK_API_KEY en las variables de entorno");
+  }
+
+  const messages: Array<Record<string, unknown>> = [
+    { role: "system", content: SYSTEM_PROMPT },
+    ...history.map((m) => ({ role: m.role, content: m.content })),
+  ];
+
+  const res = await fetch(`${DEEPSEEK_API_URL}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: DEEPSEEK_MODEL,
+      max_tokens: 600,
+      temperature: 0.6,
+      messages,
+      tools: [ESCALAR_TOOL],
+      tool_choice: "auto",
+    }),
   });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`DeepSeek API error ${res.status}: ${body.slice(0, 300)}`);
+  }
+
+  const data = await res.json();
+  const msg = data?.choices?.[0]?.message;
 
   let reply: string | null = null;
   let escalate = false;
   let escalateReason: string | undefined;
 
-  for (const block of response.content) {
-    if (block.type === "text") {
-      reply = (reply ?? "") + block.text;
-    } else if (block.type === "tool_use" && block.name === "escalar_a_humano") {
+  if (typeof msg?.content === "string" && msg.content.trim()) {
+    reply = msg.content.trim();
+  }
+
+  const toolCall = msg?.tool_calls?.find(
+    (tc: { function?: { name?: string } }) => tc?.function?.name === "escalar_a_humano"
+  );
+  if (toolCall?.function?.arguments) {
+    try {
+      const args = JSON.parse(toolCall.function.arguments);
       escalate = true;
-      escalateReason = (block.input as { motivo?: string }).motivo;
+      escalateReason = typeof args?.motivo === "string" ? args.motivo : undefined;
+    } catch {
+      escalate = true;
     }
   }
 
