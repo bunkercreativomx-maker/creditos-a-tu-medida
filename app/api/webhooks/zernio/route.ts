@@ -11,6 +11,10 @@ import { createAdminClient } from "@/lib/pocketbase-admin";
 import { notifyNewLeadToSlack } from "@/lib/slack-notify";
 import { notifyNewLead } from "@/lib/push";
 
+// DeepSeek puede tardar varios segundos; evita que Vercel corte la función
+// antes de enviar la respuesta del bot (default ~10-15s).
+export const maxDuration = 60;
+
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
   const signature = req.headers.get("X-Zernio-Signature");
