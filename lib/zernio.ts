@@ -50,6 +50,7 @@ export type ParsedInbound = {
   nombre: string | null;
   conversationId: string | null; // Zernio conversation id (para responder)
   accountId: string | null; // Zernio account id (para responder)
+  attachments: { type: string; url: string }[]; // media adjunto (imagen, video, documento, etc.)
 };
 
 /**
@@ -107,11 +108,22 @@ export function parseInboundMessage(event: ZernioInboundEvent): ParsedInbound {
     pick(event.data, ["conversation_id"])) as string | null;
 
   const accountId = (pick(msg, ["accountId"]) ??
-    pick(acc, ["id"]) ??
-    pick(event.data, ["profile_id"])) as string | null;
+      pick(acc, ["id"]) ??
+      pick(event.data, ["profile_id"])) as string | null;
 
-  return { text, telefono, nombre, conversationId, accountId };
-}
+    // Adjuntos (imágenes, videos, documentos). El payload real trae
+    // message.attachments = [{ type: "image"|"video"|"audio"|"file"|..., url }].
+    const rawAttachments = Array.isArray(msg?.attachments) ? msg.attachments : [];
+    const attachments = rawAttachments
+      .map((a) => {
+        const t = (a as Record<string, unknown>)?.type;
+        const u = (a as Record<string, unknown>)?.url;
+        return typeof t === "string" && typeof u === "string" ? { type: t, url: u } : null;
+      })
+      .filter((x): x is { type: string; url: string } => x !== null);
+
+    return { text, telefono, nombre, conversationId, accountId, attachments };
+  }
 
 /**
  * Envía un mensaje de texto a una conversación de WhatsApp vía Zernio.

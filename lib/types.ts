@@ -82,6 +82,8 @@ export type PbMessage = {
   conversation: string;
   remitente: MensajeRemitente;
   contenido: string;
+  media_url?: string | null;
+  media_type?: string | null;
   created: string;
   updated: string;
 };

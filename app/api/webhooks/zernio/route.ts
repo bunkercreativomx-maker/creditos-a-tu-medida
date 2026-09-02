@@ -41,9 +41,11 @@ export async function POST(req: NextRequest) {
   const telefonoRaw = parsed.telefono;
   const telefono = normalizePhone(telefonoRaw);
   const texto = parsed.text;
-  if (!telefono || !texto) {
-    return NextResponse.json({ ok: true, ignored: "payload incompleto" });
-  }
+    const attachments = parsed.attachments ?? [];
+    // Acepta mensajes con adjunto aunque no traigan texto (ej. foto del INE sin caption).
+    if (!telefono || (!texto && attachments.length === 0)) {
+      return NextResponse.json({ ok: true, ignored: "payload incompleto" });
+    }
 
   const pbConversationId = parsed.conversationId;
   const pbAccountId = parsed.accountId;
@@ -105,10 +107,14 @@ export async function POST(req: NextRequest) {
     botActivo = newConversation.bot_activo;
   }
 
+  // Guarda el primer adjunto (prioriza imagen) para mostrarlo en la conversación.
+  const media = attachments.find((a) => a.type === "image") ?? attachments[0] ?? null;
   await pb.collection("messages").create({
     conversation: conversationId,
     remitente: "cliente",
-    contenido: texto,
+    contenido: texto ?? "",
+    media_url: media?.url ?? null,
+    media_type: media?.type ?? null,
     created: new Date().toISOString(),
   });
 

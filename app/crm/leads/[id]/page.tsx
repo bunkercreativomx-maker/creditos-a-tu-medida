@@ -166,8 +166,25 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                     : "ml-auto bg-blue-900 text-white"
                 }`}
               >
-                <p>{m.contenido}</p>
-                <span className="mt-1 block text-[10px] opacity-60">{m.remitente}</span>
+                              {m.media_url && m.media_type === "image" && (
+                                <img
+                                  src={m.media_url}
+                                  alt="Adjunto del cliente"
+                                  className="mt-1 max-h-64 w-full rounded-md object-contain"
+                                />
+                              )}
+                              {m.media_url && m.media_type !== "image" && (
+                                <a
+                                  href={m.media_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="mt-1 block text-xs underline"
+                                >
+                                  📎 Ver adjunto
+                                </a>
+                              )}
+                              {m.contenido && <p>{m.contenido}</p>}
+                              <span className="mt-1 block text-[10px] opacity-60">{m.remitente}</span>
               </div>
             ))}
             {(!messages || messages.length === 0) && (
