@@ -119,6 +119,60 @@ export async function claimLead(leadId: string) {
   revalidatePath(`/crm/leads/${leadId}`);
 }
 
+/**
+ * Reasigna un lead a otro asesor. Permitido solo para:
+ *  - el asesor que actualmente lo tiene asignado (libera su cartera), o
+ *  - un administrador.
+ * Registra en la bitácora quién lo movió y de quién a quién, y apaga el bot de
+ * WhatsApp para que el nuevo asesor asuma el control (igual que al tomarlo).
+ */
+export async function reassignLead(leadId: string, nuevoAsignadoId: string) {
+  const pb = await createServerClient();
+  const user = pb.authStore.model as
+    | { id?: string; role?: string; full_name?: string; name?: string; email?: string }
+    | null;
+  if (!user?.id) throw new Error("No autenticado");
+
+  const lead = await pb.collection("leads").getOne(leadId).catch(() => null);
+  if (!lead) throw new Error("El lead no existe");
+
+  const esAdmin = user.role === "admin";
+  const esActualAsignado = lead.asignado_a === user.id;
+  if (!esAdmin && !esActualAsignado) {
+    throw new Error("No autorizado: solo el asesor asignado o un administrador puede reasignar");
+  }
+  if (lead.asignado_a === nuevoAsignadoId) {
+    throw new Error("El lead ya está asignado a ese asesor");
+  }
+
+  await pb.collection("leads").update(leadId, { asignado_a: nuevoAsignadoId });
+
+  // Nombre legible del actor para la bitácora.
+  const actorNombre = user.full_name || user.name || user.email || "";
+  let nuevoNombre = "";
+  try {
+    const nuevo = (await pb.collection("users").getOne(nuevoAsignadoId)) as {
+      full_name?: string; name?: string; email?: string;
+    };
+    nuevoNombre = nuevo.full_name || nuevo.name || nuevo.email || "";
+  } catch { /* best-effort */ }
+  await logAudit(pb, leadId, "Lead reasignado", `De ${actorNombre} a ${nuevoNombre}`);
+
+  // Al reasignar, el nuevo asesor asume la conversación de WhatsApp (apagar el bot).
+  try {
+    const convs = await pb.collection("conversations").getFullList({
+      filter: `lead = "${leadId}" && bot_activo = true`,
+    });
+    for (const c of convs) {
+      await pb.collection("conversations").update(c.id, { bot_activo: false, necesita_asesor: false });
+    }
+  } catch { /* best-effort */ }
+
+  revalidatePath("/crm");
+  revalidatePath("/crm/pipeline");
+  revalidatePath(`/crm/leads/${leadId}`);
+}
+
 export async function addLeadNote(leadId: string, nota: string) {
   const pb = await createServerClient();
   const user = pb.authStore.model;

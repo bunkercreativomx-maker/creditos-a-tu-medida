@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition, useState } from "react";
 import { claimLead, deleteLead } from "@/app/crm/actions";
+import { ReassignControl } from "./LeadDetailForms";
 import { calcularEdad } from "@/lib/edad";
 import type { PbLead } from "@/lib/types";
 
@@ -13,6 +14,8 @@ export function LeadCard({
   onDragEnd,
   isDragging,
   isAdmin,
+  vendedores,
+  currentUserId,
   asignadoNombre,
 }: {
   lead: PbLead;
@@ -20,6 +23,8 @@ export function LeadCard({
   onDragEnd: () => void;
   isDragging: boolean;
   isAdmin?: boolean;
+  vendedores?: { id: string; name: string }[];
+  currentUserId?: string;
   asignadoNombre?: string | null;
 }) {
   const router = useRouter();
@@ -193,6 +198,19 @@ export function LeadCard({
               Cancelar
             </button>
           </div>
+        </div>
+      )}
+
+      {asignado && (
+        <div className="mt-2 border-t border-slate-100 pt-2">
+          <ReassignControl
+            leadId={lead.id}
+            asesores={vendedores ?? []}
+            asignadoActualId={lead.asignado_a}
+            asignadoActualNombre={asignadoNombre}
+            esAdmin={isAdmin}
+            esDueno={lead.asignado_a === currentUserId}
+          />
         </div>
       )}
     </div>

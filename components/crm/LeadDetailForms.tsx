@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { addLeadNote, sendAdvisorMessage, toggleBotActivo, updateLead, deleteLead } from "@/app/crm/actions";
+import { addLeadNote, reassignLead, sendAdvisorMessage, toggleBotActivo, updateLead, deleteLead } from "@/app/crm/actions";
 import type { PbLead, Genero, EstadoCivil, TipoCredito } from "@/lib/types";
 
 /** Edición inline de los datos del lead (CURP, RFC, NSS, banco, CLABE, etc.). */
@@ -107,6 +107,114 @@ function Field({ label, input }: { label: string; input: React.ReactNode }) {
       <span className="text-xs text-slate-500">{label}</span>
       {input}
     </label>
+  );
+}
+
+/**
+ * Control para reasignar un lead a otro asesor (cuando el asesor actual no puede
+ * continuar el proceso del cliente). Solo se monta si el usuario actual tiene
+ * permiso (admin o el asesor dueño del lead).
+ */
+export function ReassignControl({
+  leadId,
+  asesores,
+  asignadoActualId,
+  asignadoActualNombre,
+  esAdmin,
+  esDueno,
+}: {
+  leadId: string;
+  asesores: { id: string; name: string }[];
+  asignadoActualId?: string | null;
+  asignadoActualNombre?: string | null;
+  esAdmin?: boolean;
+  esDueno?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [target, setTarget] = useState("");
+  const [isPending, startTransition] = useTransition();
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const puedeReasignar = esAdmin || esDueno;
+  // Candidatos: todos los asesores menos el que ya lo tiene asignado.
+  const candidatos = asesores.filter((a) => a.id !== asignadoActualId);
+  const mostrarBoton = puedeReasignar && (esAdmin || asignadoActualId);
+
+  function ejecutar() {
+    if (!target) return;
+    setError(null);
+    startTransition(async () => {
+      try {
+        await reassignLead(leadId, target);
+        setDone(true);
+        setOpen(false);
+        setTimeout(() => setDone(false), 2000);
+      } catch (err) {
+        setError((err as Error)?.message ?? "Error al reasignar el lead");
+      }
+    });
+  }
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="inline-flex items-center gap-1 text-xs text-slate-600">
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-[10px]">👤</span>
+          <span className="font-medium text-slate-700">
+            {asignadoActualNombre ?? (esDueno ? "Tú" : "Sin asignar")}
+          </span>
+          {asignadoActualId && !asignadoActualNombre && <span>asignado</span>}
+        </span>
+
+        {mostrarBoton && (
+          <button
+            disabled={isPending}
+            onClick={() => setOpen((v) => !v)}
+            className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+          >
+            ⇄ Reasignar a otro asesor
+          </button>
+        )}
+        {done && <span className="text-xs font-medium text-emerald-600">✓ Reasignado</span>}
+      </div>
+
+      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+
+      {open && (
+        <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+          {candidatos.length === 0 ? (
+            <p className="text-xs text-slate-500">No hay otros asesores para reasignar.</p>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={target}
+                onChange={(e) => setTarget(e.target.value)}
+                className="min-w-[180px] rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+              >
+                <option value="">Selecciona al nuevo asesor...</option>
+                {candidatos.map((a) => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </select>
+              <button
+                disabled={isPending || !target}
+                onClick={ejecutar}
+                className="rounded-lg bg-blue-900 px-4 py-1.5 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50"
+              >
+                {isPending ? "Reasignando..." : "Confirmar reasignación"}
+              </button>
+              <button
+                onClick={() => setOpen(false)}
+                className="rounded-lg px-3 py-1.5 text-sm text-slate-500 hover:bg-slate-200"
+              >
+                Cancelar
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

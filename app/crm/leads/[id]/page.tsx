@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { createServerClient } from "@/lib/pocketbase-server";
 import { PB_URL } from "@/lib/pocketbase";
-import { NoteForm, AdvisorMessageForm, BotToggle, LeadDataEditor, DeleteLeadButton } from "@/components/crm/LeadDetailForms";
+import { NoteForm, AdvisorMessageForm, BotToggle, LeadDataEditor, DeleteLeadButton, ReassignControl } from "@/components/crm/LeadDetailForms";
 import type { PbLead, PbConversation, PbMessage, PbLeadNote, PbLeadAudit, PbUser } from "@/lib/types";
 
 const DOCUMENTS: { key: keyof PbLead; label: string }[] = [
@@ -40,8 +40,9 @@ async function getDocumentLinks(lead: PbLead) {
 export default async function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const pb = await createServerClient();
-  const user = pb.authStore.model as { role?: string } | null;
+  const user = pb.authStore.model as { id?: string; role?: string } | null;
   const isAdmin = user?.role === "admin";
+  const currentUserId = user?.id ?? "";
 
   let lead: PbLead | null = null;
   try {
@@ -109,13 +110,33 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         </div>
         </div>
         <dl className="mt-4 grid grid-cols-2 gap-3 text-sm text-slate-600 sm:grid-cols-3">
-          <Field label="Status" value={lead.status.replace("_", " ")} capitalize />
-          <Field label="Sector" value={lead.producto_interes} />
-          <Field label="Fecha de nacimiento" value={lead.fecha_nacimiento} />
-          <Field label="Lugar de nacimiento" value={lead.lugar_nacimiento} />
-          <Field label="Género" value={lead.genero} capitalize />
-          <Field label="Estado civil" value={lead.estado_civil ? ESTADO_CIVIL_LABELS[lead.estado_civil] : null} />
-        </dl>
+                  <Field label="Status" value={lead.status.replace("_", " ")} capitalize />
+                  <Field label="Sector" value={lead.producto_interes} />
+                  <Field label="Fecha de nacimiento" value={lead.fecha_nacimiento} />
+                  <Field label="Lugar de nacimiento" value={lead.lugar_nacimiento} />
+                  <Field label="Género" value={lead.genero} capitalize />
+                  <Field label="Estado civil" value={lead.estado_civil ? ESTADO_CIVIL_LABELS[lead.estado_civil] : null} />
+                </dl>
+              </div>
+
+              <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                <h2 className="font-semibold text-blue-900">Asesor responsable</h2>
+                <p className="mt-0.5 text-xs text-slate-400">
+                  Si el asesor actual no puede continuar el proceso del cliente, reasígnalo a otro asesor.
+                </p>
+                <div className="mt-3">
+                  <ReassignControl
+                    leadId={lead.id}
+                    asesores={usuarios.map((u) => ({
+                      id: u.id,
+                      name: u.full_name || u.name || u.email || "Usuario",
+                    }))}
+                    asignadoActualId={lead.asignado_a}
+                    asignadoActualNombre={lead.asignado_a ? nombreActor(lead.asignado_a) : null}
+                    esAdmin={isAdmin}
+                    esDueno={lead.asignado_a === currentUserId}
+          />
+        </div>
       </div>
 
       <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">

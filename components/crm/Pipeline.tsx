@@ -6,7 +6,7 @@ import { PIPELINE_STAGES } from "./pipeline-stages";
 import { updateLeadStatus, createLead } from "@/app/crm/actions";
 import type { PbLead, LeadStatus } from "@/lib/types";
 
-export function Pipeline({ leads, vendedores, isAdmin }: { leads: PbLead[]; vendedores?: { id: string; name: string }[]; isAdmin?: boolean }) {
+export function Pipeline({ leads, vendedores, isAdmin, currentUserId }: { leads: PbLead[]; vendedores?: { id: string; name: string }[]; isAdmin?: boolean; currentUserId?: string }) {
   const [isPending, startTransition] = useTransition();
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overStage, setOverStage] = useState<LeadStatus | null>(null);
@@ -160,10 +160,12 @@ export function Pipeline({ leads, vendedores, isAdmin }: { leads: PbLead[]; vend
               <div className="flex flex-1 flex-col gap-2 p-2 md:overflow-y-auto">
                 {stageLeads.map((lead) => (
                   <LeadCard
-                    key={lead.id}
-                    lead={lead}
-                    isAdmin={isAdmin}
-                    asignadoNombre={asignadoNombre(lead.asignado_a)}
+                                      key={lead.id}
+                                      lead={lead}
+                                      isAdmin={isAdmin}
+                                      vendedores={vendedores ?? []}
+                                      currentUserId={currentUserId}
+                                      asignadoNombre={asignadoNombre(lead.asignado_a)}
                     isDragging={draggingId === lead.id}
                     onDragStart={(e) => {
                       e.dataTransfer.setData("text/lead-id", lead.id);
