@@ -16,6 +16,13 @@ import { notifyNewLead, notifyNeedsAdvisor } from "@/lib/push";
 // antes de enviar la respuesta del bot (default ~10-15s).
 export const maxDuration = 60;
 
+// Allowlist: SOLO procesa mensajes de la cuenta WhatsApp de Créditos.
+// El webhook de Zernio está registrado a nivel de workspace, así que recibe
+// message.received de TODAS las cuentas (incluida Solace Skin Lab). Sin este
+// guard, los mensajes de otras cuentas crean leads basura en este CRM.
+const CREDITOS_ACCOUNT_ID =
+  process.env.ZERNIO_CREDITOS_ACCOUNT_ID ?? "6a97367b77555aae01b11e1a";
+
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
   const signature = req.headers.get("X-Zernio-Signature");
@@ -44,6 +51,11 @@ export async function POST(req: NextRequest) {
   }
 
   const parsed = parseInboundMessage(event);
+  // Guard por cuenta: descarta mensajes de cualquier cuenta que no sea la de
+  // Créditos (ej. Solace Skin Lab) ANTES de crear lead, conversación o mensaje.
+  if (CREDITOS_ACCOUNT_ID && parsed.accountId !== CREDITOS_ACCOUNT_ID) {
+    return NextResponse.json({ ok: true, ignored: "cuenta no es de creditos" });
+  }
     const telefonoRaw = parsed.telefono;
     const telefono = normalizePhone(telefonoRaw);
   // Filtra spam/escáner: rechaza números que no sean un móvil mexicano válido
