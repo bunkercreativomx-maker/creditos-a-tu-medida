@@ -179,25 +179,70 @@ export async function POST(req: NextRequest) {
         : m.contenido,
     }));
 
-  const botResult = await runBotTurn(history);
-
-  // Guardar en el lead los datos de calificación que el bot recoja (nombre, apellido, sector, institución, banco, monto, NSS, tipo).
-    if (botResult.leadData) {
-      const updates: Record<string, unknown> = {};
-      if (botResult.leadData.nombre) updates.nombre = botResult.leadData.nombre;
-      if (botResult.leadData.apellido) updates.apellido = botResult.leadData.apellido;
-      if (botResult.leadData.sector) updates.sector = botResult.leadData.sector;
-      if (botResult.leadData.institucion) updates.institucion = botResult.leadData.institucion;
-      if (botResult.leadData.banco) updates.banco = botResult.leadData.banco;
-      if (botResult.leadData.monto_aproximado)
-        updates.monto_aproximado = botResult.leadData.monto_aproximado;
-      if (botResult.leadData.nss) updates.nss = botResult.leadData.nss;
-      if (botResult.leadData.tipo_credito) updates.tipo_credito = botResult.leadData.tipo_credito;
-      if (botResult.leadData.otra_financiera) updates.otra_financiera = botResult.leadData.otra_financiera;
-      if (Object.keys(updates).length > 0) {
-        await pb.collection("leads").update(leadId, updates);
+  const botResult = await runBotTurn(history, {
+    resolveTool: async (name, args) => {
+      if (name === "consultar_disponibilidad") {
+        const fecha = String(args?.fecha ?? "");
+        if (!fecha) return JSON.stringify({ error: "fecha faltante" });
+        // Busca citas ya ocupadas ese día.
+        const occupied = await pb
+          .collection("citas")
+          .getFullList({ filter: `fecha ~ "${fecha}"` })
+          .catch(() => []);
+        const hours = (occupied as unknown as { fecha?: string }[])
+          .map((c) => c.fecha?.slice(11, 16))
+          .filter(Boolean);
+        return JSON.stringify({ fecha, ocupadas: hours });
       }
+      if (name === "agendar_cita") {
+        // El evento real se crea más abajo a partir de botResult.cita.
+        return JSON.stringify({ ok: true });
+      }
+      return JSON.stringify({ ok: true });
+    },
+  });
+
+  // Save en el lead los datos de calificación que el bot recoja.
+  // Mapeo: estatus->sector, dependencia->institucion, monto_solicitado->monto_aproximado,
+  // credito_vigente->otra_financiera; empresa_credito y antiguedad_credito son campos propios.
+  if (botResult.leadData) {
+    const updates: Record<string, unknown> = {};
+    if (botResult.leadData.nombre) updates.nombre = botResult.leadData.nombre;
+    if (botResult.leadData.apellido) updates.apellido = botResult.leadData.apellido;
+    if (botResult.leadData.estatus) updates.sector = botResult.leadData.estatus;
+    if (botResult.leadData.dependencia) updates.institucion = botResult.leadData.dependencia;
+    if (botResult.leadData.monto_solicitado)
+      updates.monto_aproximado = botResult.leadData.monto_solicitado;
+    if (botResult.leadData.credito_vigente)
+      updates.otra_financiera = botResult.leadData.credito_vigente;
+    if (botResult.leadData.empresa_credito)
+      updates.empresa_credito = botResult.leadData.empresa_credito;
+    if (botResult.leadData.antiguedad_credito)
+      updates.antiguedad_credito = botResult.leadData.antiguedad_credito;
+    if (Object.keys(updates).length > 0) {
+      await pb.collection("leads").update(leadId, updates);
     }
+  }
+
+  // Si el bot agendó una cita, créala en la colección `citas` (visible en el Calendario del CRM).
+  if (botResult.cita) {
+    const fecha = botResult.cita.fecha;
+    const hora = botResult.cita.hora || "12:00";
+    const iso = `${fecha}T${hora.length === 5 ? hora : "12:00"}:00`;
+    try {
+      await pb.collection("citas").create({
+        lead: leadId,
+        titulo: botResult.cita.titulo || `Cita préstamo — ${parsed.nombre ?? ""}`,
+        fecha: iso,
+        tipo: "cita",
+        notas: botResult.cita.notas ?? null,
+        asignado_a: null,
+      });
+    } catch (err) {
+      // No rompas la respuesta si falla el calendario; se loguea.
+      console.error("Error creando cita:", err);
+    }
+  }
 
   if (botResult.reply && pbConversationId && pbAccountId) {
     await sendWhatsAppMessage(pbConversationId, pbAccountId, botResult.reply);
