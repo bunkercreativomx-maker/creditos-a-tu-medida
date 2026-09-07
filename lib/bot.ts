@@ -235,7 +235,12 @@ export type BotTurnResult = {
   cita?: { fecha: string; hora: string; titulo: string; notas?: string } | null;
 };
 
+/** Extiende BotTurnResult con un flag para el fallback anti-silencio (error técnico). */
+export type BotTurnResultWithError = BotTurnResult & { botError?: boolean };
+
 type ToolExecContext = {
+  // Contexto adicional (ej. fecha/hora actual) que se inyecta tras el system prompt.
+  contexto?: string;
   // Executor que resuelve consultar_disponibilidad y agendar_cita en la webhook
   // (que tiene acceso a PocketBase). Devuelve el contenido del tool result.
   resolveTool: (name: string, args: Record<string, unknown>) => Promise<string>;
@@ -252,6 +257,7 @@ export async function runBotTurn(
 
   const messages: Array<Record<string, unknown>> = [
     { role: "system", content: SYSTEM_PROMPT },
+    ...(ctx?.contexto ? [{ role: "system", content: ctx.contexto }] : []),
     ...history.map((m) => ({ role: m.role, content: m.content })),
   ];
 

@@ -1,0 +1,85 @@
+// ─── Agregar a tu schema.prisma existente ───────────────────────────
+
+model Tenant {
+  id                String   @id @default(cuid())
+  nombre            String
+  phoneNumberId     String   @unique   // llave de ruteo del webhook de Meta
+  wabaId            String?
+  waToken           String              // token permanente (System User). Encriptar en reposo.
+  systemPrompt      String   @db.Text   // el prompt BLOQUE 0-11 con variables ya resueltas
+  calendarId        String
+  timezone          String   @default("America/Ciudad_Juarez")
+  duracionCitaMin   Int      @default(30)
+  horarioInicio     String   @default("09:00")
+  horarioFin        String   @default("18:00")
+  diasHabiles       Int[]    @default([1, 2, 3, 4, 5, 6]) // 1=lunes ... 7=domingo (Luxon)
+  direccion         String
+  referencia        String?
+  linkMaps          String?
+  activo            Boolean  @default(true)
+
+  conversaciones    Conversation[]
+  @@map("tenants")
+}
+
+model Conversation {
+  id            String   @id @default(cuid())
+  tenantId      String
+  waPhone       String              // número del cliente (from)
+  enHandoff     Boolean  @default(false)
+  handoffMotivo String?
+  ultimoMensaje DateTime @default(now())   // para la ventana de 24h de Meta
+  createdAt     DateTime @default(now())
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  lead     Lead?
+  mensajes Message[]
+
+  @@unique([tenantId, waPhone])
+  @@map("conversations")
+}
+
+model Lead {
+  id             String   @id @default(cuid())
+  conversationId String   @unique
+
+  // ── Prescreen (BLOQUE 4) ──
+  nombre            String?
+  estatus           String?   // jubilado | pensionado | ninguno
+  dependencia       String?   // IMSS | ISSSTE | CFE | SNTE | PEMEX | otra:___
+  montoSolicitado   String?
+  creditoVigente    Boolean?
+  empresaCredito    String?
+  antiguedadCredito String?
+
+  // ── Elegibilidad y cita ──
+  elegible     Boolean?
+  citaFecha    DateTime?
+  citaEventId  String?
+  citaEstatus  String?   @default("sin_cita")
+
+  // ── Referido (BLOQUE 6) ──
+  referidoNombre   String?
+  referidoTelefono String?
+
+  cerrado   Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  @@map("leads")
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  waMessageId    String?  @unique   // dedupe de reintentos de Meta
+  rol            String            // user | assistant
+  texto          String   @db.Text
+  modelo         String?           // haiku | sonnet | fallback
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+

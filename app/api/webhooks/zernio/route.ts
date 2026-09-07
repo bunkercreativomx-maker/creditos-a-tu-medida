@@ -7,7 +7,7 @@ import {
   isValidMexicanMobile,
   type ZernioInboundEvent,
 } from "@/lib/zernio";
-import { runBotTurn } from "@/lib/bot";
+import { runBotTurn, type BotTurnResultWithError } from "@/lib/bot";
 import { createAdminClient } from "@/lib/pocketbase-admin";
 import { notifyNewLeadToSlack } from "@/lib/slack-notify";
 import { notifyNewLead, notifyNeedsAdvisor } from "@/lib/push";
@@ -180,6 +180,17 @@ export async function POST(req: NextRequest) {
     }));
 
   const botResult = await runBotTurn(history, {
+    // Fecha/hora REAL de Cd. Juárez inyectada como contexto: evita que el bot
+    // invente fechas para "mañana"/"la próxima semana" (BLOQUE 7).
+    contexto: `FECHA Y HORA ACTUAL: ${new Intl.DateTimeFormat("es-MX", {
+      timeZone: "America/Ciudad_Juarez",
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date())} (America/Ciudad_Juarez).\n\nCuando el cliente pida un día relativo (hoy, mañana, la próxima semana), calcula la fecha concreta usando esta fecha actual. No inventes fechas.`,
     resolveTool: async (name, args) => {
       if (name === "consultar_disponibilidad") {
         const fecha = String(args?.fecha ?? "");
@@ -200,6 +211,10 @@ export async function POST(req: NextRequest) {
       }
       return JSON.stringify({ ok: true });
     },
+  }).catch((err) => {
+    // Fallback anti-silencio: NUNCA terminar un turno sin respuesta al cliente.
+    console.error("[webhook] error en runBotTurn:", err);
+    return { reply: null, escalate: false, leadData: null, cita: null, botError: true } as BotTurnResultWithError;
   });
 
   // Save en el lead los datos de calificación que el bot recoja.
@@ -242,6 +257,27 @@ export async function POST(req: NextRequest) {
       // No rompas la respuesta si falla el calendario; se loguea.
       console.error("Error creando cita:", err);
     }
+  }
+
+  // Fallback anti-silencio: si el bot falló (error técnico) o no generó respuesta,
+  // NUNCA dejamos al cliente sin respuesta. Mandamos el Cierre B y marcamos para asesor.
+  const resultWithError = botResult as BotTurnResultWithError;
+  if ((resultWithError.botError || !botResult.reply || !botResult.reply.trim()) && pbConversationId && pbAccountId) {
+    const fallbackMsg = `Perfecto, ${parsed.nombre ?? ""}. Ya quedó registrada su información. Un asesor se pondrá en contacto con usted lo antes posible para darle todos los detalles. Quedo pendiente por aquí por cualquier cosa. ¡Excelente día!`.replace(/\s+/g, " ").trim();
+    await sendWhatsAppMessage(pbConversationId, pbAccountId, fallbackMsg);
+    await pb.collection("messages").create({
+      conversation: conversationId,
+      remitente: "bot",
+      contenido: fallbackMsg,
+      created: new Date().toISOString(),
+    });
+    // Marca la conversación para intervención humana.
+    await pb
+      .collection("conversations")
+      .update(conversationId, { bot_activo: false, necesita_asesor: true })
+      .catch(() => {});
+    await pb.collection("leads").update(leadId, { status: "en_seguimiento" }).catch(() => {});
+    return NextResponse.json({ ok: true, fallback: true });
   }
 
   if (botResult.reply && pbConversationId && pbAccountId) {
