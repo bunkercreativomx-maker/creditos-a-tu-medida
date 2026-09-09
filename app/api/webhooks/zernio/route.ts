@@ -262,41 +262,65 @@ export async function POST(req: NextRequest) {
   // Fallback anti-silencio: si el bot falló (error técnico) o no generó respuesta,
   // NUNCA dejamos al cliente sin respuesta. Mandamos el Cierre B y marcamos para asesor.
   const resultWithError = botResult as BotTurnResultWithError;
-  if ((resultWithError.botError || !botResult.reply || !botResult.reply.trim()) && pbConversationId && pbAccountId) {
-    const fallbackMsg = `Perfecto, ${parsed.nombre ?? ""}. Ya quedó registrada su información. Un asesor se pondrá en contacto con usted lo antes posible para darle todos los detalles. Quedo pendiente por aquí por cualquier cosa. ¡Excelente día!`.replace(/\s+/g, " ").trim();
-    await sendWhatsAppMessage(pbConversationId, pbAccountId, fallbackMsg);
-    await pb.collection("messages").create({
-      conversation: conversationId,
-      remitente: "bot",
-      contenido: fallbackMsg,
-      created: new Date().toISOString(),
-    });
-    // Marca la conversación para intervención humana.
+  const botFallo =
+    resultWithError.botError ||
+    !botResult.reply ||
+    !botResult.reply.trim();
+
+  // Marca la conversación para intervención humana cuando el flujo lo pida.
+  const marcarParaAsesor = async () => {
     await pb
       .collection("conversations")
       .update(conversationId, { bot_activo: false, necesita_asesor: true })
       .catch(() => {});
     await pb.collection("leads").update(leadId, { status: "en_seguimiento" }).catch(() => {});
-    return NextResponse.json({ ok: true, fallback: true });
-  }
+  };
 
-  if (botResult.reply && pbConversationId && pbAccountId) {
-    await sendWhatsAppMessage(pbConversationId, pbAccountId, botResult.reply);
+  // Helper: envía un mensaje y lo persiste; si el envío FALLA, lanza para que
+  // el flujo caiga al fallback (nunca dejar al cliente en silencio).
+  const enviarMensajeBot = async (texto: string) => {
+    if (!pbConversationId || !pbAccountId) throw new Error("sin destino para enviar");
+    await sendWhatsAppMessage(pbConversationId, pbAccountId, texto);
     await pb.collection("messages").create({
-          conversation: conversationId,
-          remitente: "bot",
-          contenido: botResult.reply,
-          created: new Date().toISOString(),
+      conversation: conversationId,
+      remitente: "bot",
+      contenido: texto,
+      created: new Date().toISOString(),
     });
-  }
+  };
 
-  if (botResult.escalate) {
-    await pb
-      .collection("conversations")
-      .update(conversationId, { bot_activo: false, necesita_asesor: true });
-    await pb.collection("leads").update(leadId, { status: "en_seguimiento" });
-    // Notifica a los asesores que esta conversación ya está lista y requiere su atención.
-    await notifyNeedsAdvisor(leadId);
+  try {
+    if (botFallo) {
+      // El bot no produjo respuesta útil: mandamos el Cierre B anti-silencio.
+      const fallbackMsg = `Perfecto, ${parsed.nombre ?? ""}. Ya quedó registrada su información. Un asesor se pondrá en contacto con usted lo antes posible para darle todos los detalles. Quedo pendiente por aquí por cualquier cosa. ¡Excelente día!`.replace(/\s+/g, " ").trim();
+      await enviarMensajeBot(fallbackMsg);
+      await marcarParaAsesor();
+      return NextResponse.json({ ok: true, fallback: true });
+    }
+
+    // Respuesta normal del bot.
+    await enviarMensajeBot(botResult.reply!);
+
+    if (botResult.escalate) {
+      await marcarParaAsesor();
+      // Notifica a los asesores que esta conversación ya está lista y requiere su atención.
+      await notifyNeedsAdvisor(leadId);
+    }
+  } catch (err) {
+    // Cualquier fallo técnico (DeepSeek, PocketBase, o el envío saliente a Zernio)
+    // NUNCA deja al cliente sin respuesta: intentamos el Cierre B anti-silencio.
+    console.error("[webhook] error enviando respuesta, se intenta fallback:", err);
+    try {
+      const fallbackMsg = `Perfecto, ${parsed.nombre ?? ""}. Ya quedó registrada su información. Un asesor se pondrá en contacto con usted lo antes posible para darle todos los detalles. Quedo pendiente por aquí por cualquier cosa. ¡Excelente día!`.replace(/\s+/g, " ").trim();
+      if (pbConversationId && pbAccountId) {
+        await sendWhatsAppMessage(pbConversationId, pbAccountId, fallbackMsg).catch((e2) => {
+          console.error("[webhook] fallback de envío también falló:", e2);
+        });
+      }
+    } finally {
+      await marcarParaAsesor();
+    }
+    return NextResponse.json({ ok: true, fallback: true });
   }
 
   // Notificar lead nuevo (best-effort)

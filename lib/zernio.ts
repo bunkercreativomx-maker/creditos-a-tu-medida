@@ -174,6 +174,7 @@ export async function sendWhatsAppMessage(
       "Idempotency-Key": crypto.randomUUID(),
     },
     body: JSON.stringify({ accountId, message: text }),
+    signal: AbortSignal.timeout(25_000),
   });
 
   if (!res.ok) {
