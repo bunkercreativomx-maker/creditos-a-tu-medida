@@ -1,5 +1,11 @@
 const DEEPSEEK_API_URL = process.env.DEEPSEEK_API_BASE ?? "https://api.deepseek.com";
 const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL ?? "deepseek-chat";
+// Tope duro por llamada al LLM. Sin esto, un fetch que se cuelga supera el
+// maxDuration=60 del webhook y Vercel mata la función ANTES de que el bloque
+// anti-silencio de la ruta pueda responder → el cliente se queda sin respuesta
+// y sin reintento (el marcador de dedupe ya se escribió). Mantener MUY por
+// debajo de 60s para que sobre tiempo de correr el fallback.
+const DEEPSEEK_TIMEOUT_MS = 40_000;
 
 // ===== BLOQUE 0 — Variables de configuración (de instrucciones-bot-whatsapp-jubilados.md) =====
 const CFG = {
@@ -255,6 +261,12 @@ export async function runBotTurn(
     throw new Error("Falta DEEPSEEK_API_KEY en las variables de entorno");
   }
 
+  // Presupuesto de tiempo GLOBAL (no solo por llamada): si entre todas las
+  // rondas del loop de tool-calling se pasa del tope, abortamos el fetch en
+  // curso y lanzamos → el .catch del webhook dispara el fallback anti-silencio.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DEEPSEEK_TIMEOUT_MS);
+
   const messages: Array<Record<string, unknown>> = [
     { role: "system", content: SYSTEM_PROMPT },
     ...(ctx?.contexto ? [{ role: "system", content: ctx.contexto }] : []),
@@ -264,6 +276,7 @@ export async function runBotTurn(
   const callLLM = async (msgs: Array<Record<string, unknown>>) => {
     const res = await fetch(`${DEEPSEEK_API_URL}/chat/completions`, {
       method: "POST",
+      signal: controller.signal,
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
@@ -374,5 +387,6 @@ export async function runBotTurn(
     msg = await callLLM(working);
   }
 
+  clearTimeout(timer);
   return { reply, escalate, escalateReason, leadData, cita };
 }
