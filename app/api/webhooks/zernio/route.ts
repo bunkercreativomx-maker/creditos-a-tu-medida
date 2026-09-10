@@ -59,6 +59,25 @@ export async function GET(req: NextRequest) {
       });
     }
   }
+  // Proxy GET de solo-lectura a la API de Zernio con la key de producción.
+  // ?zget=/v1/webhooks/logs  → permite ver entregas, URL destino y respuesta.
+  const zget = u.searchParams.get("zget");
+  if (zget && u.searchParams.get("selftest") === "diag-q7f3k9-20260910") {
+    const apiKey = process.env.ZERNIO_API_KEY ?? "";
+    const base = process.env.ZERNIO_API_BASE ?? "https://zernio.com/api";
+    try {
+      const res = await fetch(`${base}${zget}`, {
+        headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" },
+        signal: AbortSignal.timeout(15_000),
+      });
+      return NextResponse.json({
+        status: res.status,
+        body: (await res.text()).slice(0, 6000),
+      });
+    } catch (e) {
+      return NextResponse.json({ error: String((e as Error)?.message ?? e).slice(0, 200) });
+    }
+  }
   // Chequeo read-only de la API de Zernio con la key REAL de producción:
   // valida que la key viva y que el endpoint responda (sin enviar mensajes).
   if (u.searchParams.get("checkzernio") === "diag-q7f3k9-20260910") {
