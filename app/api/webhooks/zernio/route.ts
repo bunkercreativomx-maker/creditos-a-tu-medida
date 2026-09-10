@@ -70,9 +70,35 @@ export async function GET(req: NextRequest) {
         headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" },
         signal: AbortSignal.timeout(15_000),
       });
+      const txt = await res.text();
+      // Vista compacta para /webhooks/logs (evita truncar el payload completo).
+      if (zget.includes("webhooks/logs")) {
+        try {
+          const parsed = JSON.parse(txt) as { logs?: unknown[] };
+          const brief = (parsed.logs ?? []).map((raw) => {
+            const L = raw as Record<string, unknown>;
+            const rp = (L.requestPayload ?? {}) as Record<string, unknown>;
+            const m = (rp.message ?? {}) as Record<string, unknown>;
+            return {
+              eventId: L.eventId,
+              status: L.status,
+              code: L.statusCode,
+              attempt: L.attemptNumber,
+              ms: L.responseTime,
+              url: L.url,
+              resp: L.responseBody,
+              text: m.text ?? null,
+              at: L.createdAt,
+            };
+          });
+          return NextResponse.json({ status: res.status, count: brief.length, logs: brief });
+        } catch {
+          /* cae al raw */
+        }
+      }
       return NextResponse.json({
         status: res.status,
-        body: (await res.text()).slice(0, 6000),
+        body: txt.slice(0, 6000),
       });
     } catch (e) {
       return NextResponse.json({ error: String((e as Error)?.message ?? e).slice(0, 200) });
