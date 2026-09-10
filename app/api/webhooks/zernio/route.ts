@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
   // Proxy GET de solo-lectura a la API de Zernio con la key de producción.
   // ?zget=/v1/webhooks/logs  → permite ver entregas, URL destino y respuesta.
   const zget = u.searchParams.get("zget");
-  if (zget && u.searchParams.get("selftest") === "diag-q7f3k9-20260910") {
+  if (zget && u.searchParams.get("zkey") === "diag-q7f3k9-20260910") {
     const apiKey = process.env.ZERNIO_API_KEY ?? "";
     const base = process.env.ZERNIO_API_BASE ?? "https://zernio.com/api";
     try {
