@@ -23,6 +23,19 @@ export const maxDuration = 60;
 const CREDITOS_ACCOUNT_ID =
   process.env.ZERNIO_CREDITOS_ACCOUNT_ID ?? "6a97367b77555aae01b11e1a";
 
+// DIAGNÓSTICO (temporal): GET devuelve el commit desplegado en ESTA URL.
+// Permite verificar desde fuera qué versión del código sirve cada host,
+// incluida cualquier URL de deployment a la que Zernio pudiera estar apuntando.
+export async function GET() {
+  return NextResponse.json({
+    ok: true,
+    route: "zernio-webhook",
+    diag: "v3",
+    sha: (process.env.VERCEL_GIT_COMMIT_SHA ?? "?").slice(0, 7),
+    url: process.env.VERCEL_URL ?? "?",
+  });
+}
+
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
   const signature = req.headers.get("X-Zernio-Signature");
@@ -36,10 +49,13 @@ export async function POST(req: NextRequest) {
 
   // DIAGNÓSTICO TEMPORAL: deja rastro en PocketBase en cada etapa para poder
   // ver desde fuera hasta dónde llega el webhook y con qué error muere.
+  // Graba además el commit desplegado y el host que Zernio realmente golpea.
+  const sha = process.env.VERCEL_GIT_COMMIT_SHA ?? "?";
+  const host = req.headers.get("host") ?? "?";
   const trace = async (tag: string) => {
     await pb
       .collection("processed_webhook_events")
-      .create({ event_id: `v3:${tag}:${event.id}` })
+      .create({ event_id: `v3[${sha.slice(0, 7)}|${host}]:${tag}` })
       .catch(() => {});
   };
   await trace("entry");
