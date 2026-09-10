@@ -59,6 +59,31 @@ export async function GET(req: NextRequest) {
       });
     }
   }
+  // Chequeo read-only de la API de Zernio con la key REAL de producción:
+  // valida que la key viva y que el endpoint responda (sin enviar mensajes).
+  if (u.searchParams.get("checkzernio") === "diag-q7f3k9-20260910") {
+    const t0 = Date.now();
+    const apiKey = process.env.ZERNIO_API_KEY ?? "";
+    const base = process.env.ZERNIO_API_BASE ?? "https://zernio.com/api";
+    const out: Record<string, unknown> = {
+      keyPresent: apiKey.length > 0,
+      keyPrefix: apiKey ? apiKey.slice(0, 6) : null,
+      base,
+      conversacion: process.env.ZERNIO_WHATSAPP_PROFILE_ID ?? null,
+    };
+    try {
+      const res = await fetch(`${base}/v1/profiles`, {
+        headers: { Authorization: `Bearer ${apiKey}`, Accept: "application/json" },
+        signal: AbortSignal.timeout(10_000),
+      });
+      out.status = res.status;
+      out.body = (await res.text()).slice(0, 300);
+    } catch (e) {
+      out.error = String((e as Error)?.message ?? e).slice(0, 200);
+    }
+    out.ms = Date.now() - t0;
+    return NextResponse.json(out);
+  }
   return NextResponse.json({
     ok: true,
     route: "zernio-webhook",
