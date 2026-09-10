@@ -34,6 +34,16 @@ export async function POST(req: NextRequest) {
   const event = JSON.parse(rawBody) as ZernioInboundEvent;
   const pb = await createAdminClient();
 
+  // DIAGNÓSTICO TEMPORAL: deja rastro en PocketBase en cada etapa para poder
+  // ver desde fuera hasta dónde llega el webhook y con qué error muere.
+  const trace = async (tag: string) => {
+    await pb
+      .collection("processed_webhook_events")
+      .create({ event_id: `v3:${tag}:${event.id}` })
+      .catch(() => {});
+  };
+  await trace("entry");
+
   // Idempotencia: descarta reintentos del mismo evento (Zernio reintenta hasta 7 veces).
   const existing = await pb
     .collection("processed_webhook_events")
@@ -77,6 +87,7 @@ export async function POST(req: NextRequest) {
     // descarta los reintentos. Tradeoff: si el proceso muere a mitad, ese mensaje
     // se pierde (no se reintenta) — aceptable frente a spamear al cliente.
         await pb.collection("processed_webhook_events").create({ event_id: event.id });
+        await trace("marked");
 
   const pbConversationId = parsed.conversationId;
   const pbAccountId = parsed.accountId;
@@ -150,8 +161,10 @@ export async function POST(req: NextRequest) {
   });
 
   if (!botActivo) {
+    await trace("bot_inactivo");
     return NextResponse.json({ ok: true, bot: "inactivo" });
   }
+  await trace("msg_guardado");
 
   // Arma el historial reciente para el bot (últimos 10 mensajes: suficiente contexto
     // sin inflar los tokens de entrada, que es lo que más tarda en DeepSeek).
@@ -179,6 +192,7 @@ export async function POST(req: NextRequest) {
         : m.contenido,
     }));
 
+  await trace("antes_bot");
   const botResult = await runBotTurn(history, {
     // Fecha/hora REAL de Cd. Juárez inyectada como contexto: evita que el bot
     // invente fechas para "mañana"/"la próxima semana" (BLOQUE 7).
@@ -214,8 +228,10 @@ export async function POST(req: NextRequest) {
   }).catch((err) => {
     // Fallback anti-silencio: NUNCA terminar un turno sin respuesta al cliente.
     console.error("[webhook] error en runBotTurn:", err);
+    trace("ERR_bot:" + String(err?.message ?? err).slice(0, 150));
     return { reply: null, escalate: false, leadData: null, cita: null, botError: true } as BotTurnResultWithError;
   });
+  await trace(`despues_bot:reply=${botResult.reply ? "si" : "no"}`);
 
   // Save en el lead los datos de calificación que el bot recoja.
   // Mapeo: estatus->sector, dependencia->institucion, monto_solicitado->monto_aproximado,
@@ -310,6 +326,7 @@ export async function POST(req: NextRequest) {
     // Cualquier fallo técnico (DeepSeek, PocketBase, o el envío saliente a Zernio)
     // NUNCA deja al cliente sin respuesta: intentamos el Cierre B anti-silencio.
     console.error("[webhook] error enviando respuesta, se intenta fallback:", err);
+    await trace("ERR_envio:" + String((err as Error)?.message ?? err).slice(0, 150));
     try {
       const fallbackMsg = `Perfecto, ${parsed.nombre ?? ""}. Ya quedó registrada su información. Un asesor se pondrá en contacto con usted lo antes posible para darle todos los detalles. Quedo pendiente por aquí por cualquier cosa. ¡Excelente día!`.replace(/\s+/g, " ").trim();
       if (pbConversationId && pbAccountId) {
