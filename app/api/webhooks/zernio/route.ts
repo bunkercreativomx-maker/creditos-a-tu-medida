@@ -26,7 +26,39 @@ const CREDITOS_ACCOUNT_ID =
 // DIAGNÓSTICO (temporal): GET devuelve el commit desplegado en ESTA URL.
 // Permite verificar desde fuera qué versión del código sirve cada host,
 // incluida cualquier URL de deployment a la que Zernio pudiera estar apuntando.
-export async function GET() {
+// Con ?selftest=<token> ejecuta runBotTurn EN EL SERVIDOR (usa la key real de
+// producción) y reporta latencia + respuesta + error, sin enviar WhatsApp.
+export async function GET(req: NextRequest) {
+  const u = new URL(req.url);
+  if (u.searchParams.get("selftest") === "diag-q7f3k9-20260910") {
+    const t0 = Date.now();
+    try {
+      const r = await runBotTurn(
+        [
+          { role: "user", content: "Buenas tardes" },
+          { role: "user", content: "Quiero un préstamo" },
+        ],
+        {
+          contexto: "FECHA Y HORA ACTUAL: miércoles 9 de septiembre de 2026, 20:00 (America/Ciudad_Juarez).",
+          resolveTool: async () => JSON.stringify({ ok: true }),
+        }
+      );
+      return NextResponse.json({
+        ok: true,
+        ms: Date.now() - t0,
+        reply: r.reply,
+        escalate: r.escalate,
+        leadData: r.leadData,
+      });
+    } catch (e) {
+      const err = e as Error;
+      return NextResponse.json({
+        ok: false,
+        ms: Date.now() - t0,
+        error: String(err?.message ?? err).slice(0, 300),
+      });
+    }
+  }
   return NextResponse.json({
     ok: true,
     route: "zernio-webhook",
