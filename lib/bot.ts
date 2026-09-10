@@ -5,7 +5,11 @@ const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL ?? "deepseek-chat";
 // anti-silencio de la ruta pueda responder → el cliente se queda sin respuesta
 // y sin reintento (el marcador de dedupe ya se escribió). Mantener MUY por
 // debajo de 60s para que sobre tiempo de correr el fallback.
-const DEEPSEEK_TIMEOUT_MS = 40_000;
+const DEEPSEEK_TIMEOUT_MS = 30_000;
+// Si tras esta marca el modelo sigue pidiendo herramientas, forzamos una
+// llamada SIN herramientas para que responda texto (evita quedar mudo).
+const FORCE_TEXT_AFTER_MS = 22_000;
+const MAX_TOOL_ROUNDS = 4;
 
 // ===== BLOQUE 0 — Variables de configuración (de instrucciones-bot-whatsapp-jubilados.md) =====
 const CFG = {
@@ -273,7 +277,7 @@ export async function runBotTurn(
     ...history.map((m) => ({ role: m.role, content: m.content })),
   ];
 
-  const callLLM = async (msgs: Array<Record<string, unknown>>) => {
+  const callLLM = async (msgs: Array<Record<string, unknown>>, allowTools = true) => {
     const res = await fetch(`${DEEPSEEK_API_URL}/chat/completions`, {
       method: "POST",
       signal: controller.signal,
@@ -286,13 +290,20 @@ export async function runBotTurn(
         max_tokens: 500,
         temperature: 0.6,
         messages: msgs,
-        tools: [
-          ESCALAR_TOOL,
-          GUARDAR_DATOS_TOOL,
-          CONSULTAR_DISPONIBILIDAD_TOOL,
-          AGENDAR_CITA_TOOL,
-        ],
-        tool_choice: "auto",
+        // En la llamada forzada de cierre omitimos las herramientas para que el
+        // modelo tenga que devolver TEXTO (si no, algunos modelos quedan mudos
+        // pidiendo tools para siempre).
+        ...(allowTools
+          ? {
+              tools: [
+                ESCALAR_TOOL,
+                GUARDAR_DATOS_TOOL,
+                CONSULTAR_DISPONIBILIDAD_TOOL,
+                AGENDAR_CITA_TOOL,
+              ],
+              tool_choice: "auto",
+            }
+          : {}),
       }),
     });
     if (!res.ok) {
@@ -303,6 +314,7 @@ export async function runBotTurn(
     return data?.choices?.[0]?.message;
   };
 
+  const startedAt = Date.now();
   let working: Array<Record<string, unknown>> = [...messages];
   let msg = await callLLM(working);
 
@@ -313,8 +325,10 @@ export async function runBotTurn(
   let cita: BotTurnResult["cita"] = null;
 
   // Loop iterativo de tool-calling: tras ejecutar cada tool, vuelve a llamar al
-  // modelo con el resultado. Cap de 5 rondas para evitar bucles.
-  for (let round = 0; round < 5; round++) {
+  // modelo con el resultado. Acotado en rondas Y en tiempo: si se agota
+  // cualquiera de los dos, la última llamada va SIN herramientas para forzar
+  // una respuesta de texto (nunca terminar el turno en silencio).
+  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const toolCalls: Array<{
       id?: string;
       function?: { name?: string; arguments?: string };
@@ -384,7 +398,22 @@ export async function runBotTurn(
         content: toolResults[i] ?? JSON.stringify({ ok: true }),
       })),
     ];
-    msg = await callLLM(working);
+    // Decide si la siguiente llamada puede seguir usando herramientas.
+    // Si es la última ronda o ya nos pasamos del presupuesto de tiempo,
+    // forzamos texto (sin tools) para no quedarnos mudos ni rebasar a Vercel.
+    const lastRound = round === MAX_TOOL_ROUNDS - 1;
+    const outOfTime = Date.now() - startedAt > FORCE_TEXT_AFTER_MS;
+    const allowTools = !lastRound && !outOfTime;
+
+    if (allowTools) {
+      msg = await callLLM(working);
+    } else {
+      const finalMsg = await callLLM(working, false);
+      if (typeof finalMsg?.content === "string" && finalMsg.content.trim()) {
+        reply = finalMsg.content.trim();
+      }
+      break;
+    }
   }
 
   clearTimeout(timer);

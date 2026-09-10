@@ -33,6 +33,9 @@ export async function GET() {
     diag: "v3",
     sha: (process.env.VERCEL_GIT_COMMIT_SHA ?? "?").slice(0, 7),
     url: process.env.VERCEL_URL ?? "?",
+    // Diagnóstico: qué proveedor/modelo usa el bot en producción (sin exponer la key).
+    modelo: process.env.DEEPSEEK_MODEL ?? "(default deepseek-chat)",
+    base: process.env.DEEPSEEK_API_BASE ?? "(default api.deepseek.com)",
   });
 }
 
