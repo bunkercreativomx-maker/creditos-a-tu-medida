@@ -133,14 +133,16 @@ Prohibido decir: "no tengo esa información", "no puedo ayudarte con eso", "no s
 - Explicaciones de por qué preguntas algo ("es que el sistema pide…").
 
 ## Herramientas
-Usa guardar_datos_lead cada vez que el cliente comparta cualquiera de los datos del BLOQUE 4, aunque vayan apareciendo por separado. Usa escalar_a_humano cuando aplique el BLOQUE 8 o el flujo pida handoff. Usa consultar_disponibilidad para verificar horarios reales antes de proponer citas (BLOQUE 7). Usa agendar_cita para crear el evento cuando el cliente confirme. Nunca inventes datos que no estén en la conversación.`;
+Usa guardar_datos_lead cada vez que el cliente comparta cualquiera de los datos del BLOQUE 4, aunque vayan apareciendo por separado. Usa escalar_a_humano cuando aplique el BLOQUE 8 o el flujo pida handoff. Usa consultar_disponibilidad para verificar horarios reales antes de proponer citas (BLOQUE 7). Usa agendar_cita para crear el evento cuando el cliente confirme. Nunca inventes datos que no estén en la conversación.
+
+ORDEN OBLIGATORIO: al completar el último dato del BLOQUE 4 NO escalas ni cierras — pasas DIRECTAMENTE al Paso 7 y BLOQUE 7: propones horarios con consultar_disponibilidad, confirmas el elegido, creas el evento con agendar_cita y entregas la dirección (${CFG.DIRECCION_SUCURSAL} ${CFG.REFERENCIA_UBICACION}) en la confirmación. Solo tras agendar envías el Cierre A. Si el cliente pregunta por la dirección en CUALQUIER momento, entrégala de inmediato tal como está en ${CFG.DIRECCION_SUCURSAL}. Escalar con los datos completos pero SIN cita es un error grave: la cita debe crearse primero.`;
 
 const ESCALAR_TOOL = {
   type: "function",
   function: {
     name: "escalar_a_humano",
     description:
-      "Marca la conversación para que una persona del equipo tome el control. Úsalo cuando: el cliente pide hablar con una persona; pregunta por tasas/intereses/CAT/plazos/mensualidades/montos/requisitos/depósitos/estatus de trámite; se queja o reclama; menciona algo legal/cobranza/embargo/fallecimiento; hace una pregunta cuya respuesta no está en las instrucciones; envía nota de voz o documento no procesable; no se pudo obtener la información necesaria; o el flujo termina en handoff (referido, datos completos).",
+      "Marca la conversación para que una persona del equipo tome el control. Úsalo cuando: el cliente pide hablar con una persona; pregunta por tasas/intereses/CAT/plazos/mensualidades/montos/requisitos/depósitos/estatus de trámite; se queja o reclama; menciona algo legal/cobranza/embargo/fallecimiento; hace una pregunta cuya respuesta no está en las instrucciones; envía nota de voz o documento no procesable; no se pudo obtener la información necesaria; o el flujo termina en handoff por un referido (Ramas A/B del BLOQUE 6). NUNCA lo uses por haber completado los datos del BLOQUE 4: completar los datos lleva a AGENDAR la cita (BLOQUE 7) y entregar la dirección, no a escalar.",
     parameters: {
       type: "object",
       properties: {
