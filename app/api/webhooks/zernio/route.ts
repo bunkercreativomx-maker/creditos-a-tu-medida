@@ -12,6 +12,15 @@ import { runBotTurn, type BotTurnResultWithError } from "@/lib/bot";
 import { createAdminClient } from "@/lib/pocketbase-admin";
 import { notifyNewLeadToSlack } from "@/lib/slack-notify";
 import { notifyNewLead, notifyNeedsAdvisor } from "@/lib/push";
+import {
+  sumarDiasHabiles,
+  diaSemanaEsp,
+  fechaEsp,
+  extraerHora,
+  pideAgendar,
+  detectarDia,
+  horariosLibres,
+} from "@/lib/agenda";
 
 // El trabajo pesado (LLM + envío) corre DESPUÉS de responder a Zernio (after()),
 // así que este tope cubre ese trabajo en segundo plano.
@@ -232,10 +241,81 @@ async function procesarTurnoBot(args: {
       .replace(/\s+/g, " ")
       .trim();
 
+    // ===== AGENDADO DETERMINISTA (fallback si Gemini no agenda) =====
+    // Gemini encadena consultar_disponibilidad -> agendar_cita y a veces falla;
+    // el fallback anti-silencio mandaba Cierre B y escalaba SIN crear la cita.
+    // Si el lead ya tiene los datos del prescreen completos y el cliente pidió
+    // agendar, aquí se agenda por código: se proponen horarios reales o se crea
+    // la cita si dio la hora, y se entrega la dirección. Devuelve el texto a
+    // enviar, o null si no aplica (hay que escalar).
+    const textoCliente = String(parsed.text ?? "").trim();
+    const intentarAgendarDeterminista = async (): Promise<string | null> => {
+      const lead = await pb
+        .collection("leads")
+        .getOne(leadId)
+        .catch(() => null);
+      const nombreLead = String(lead?.nombre ?? "").trim();
+      if (!nombreLead) return null;
+      if (!pideAgendar(textoCliente)) return null;
+
+      const horaPedida = extraerHora(textoCliente);
+      const fechaPedida = detectarDia(textoCliente);
+      const DIR = "Benjamín Franklin 3220, Local 22D, Plaza de las Américas, Zona Pronaf, C.P. 32315, Cd. Juárez, Chihuahua";
+
+      const leerOcupadas = async (fecha: string): Promise<string[]> => {
+        const occ = await pb
+          .collection("citas")
+          .getFullList({ filter: `fecha ~ "${fecha}"` })
+          .catch(() => []);
+        return (occ as unknown as { fecha?: string }[])
+          .map((c) => c.fecha?.slice(11, 16))
+          .filter(Boolean) as string[];
+      };
+
+      // Caso 1: el cliente dio una hora concreta para un día.
+      if (horaPedida && fechaPedida) {
+        const ocupadas = await leerOcupadas(fechaPedida);
+        if (!ocupadas.includes(horaPedida)) {
+          const iso = `${fechaPedida}T${horaPedida}:00`;
+          try {
+            await pb.collection("citas").create({
+              lead: leadId,
+              titulo: `Cita préstamo — ${nombreLead} — ${String(lead?.institucion ?? "")}`,
+              fecha: iso,
+              tipo: "cita",
+              notas: `Agendada por código (fallback determinista). Tel: ${telefono}`,
+              asignado_a: null,
+            });
+          } catch (err) {
+            console.error("[webhook] error creando cita determinista:", err);
+            return null;
+          }
+          return `¡Listo, ${nombreLead}! Su cita queda confirmada: 📅 ${fechaEsp(fechaPedida)} a las ${horaPedida} 📍 ${DIR}. Un asesor lo estará esperando. Si necesita cambiar la cita, solo escríbame por aquí.`;
+        }
+        // La hora pedida está ocupada → proponer alternativas.
+        const libres = horariosLibres(ocupadas).slice(0, 2);
+        if (libres.length === 0) return null;
+        return `A esa hora ya está apartado. Le puedo ofrecer las ${libres[0]} o las ${libres[1]} el ${diaSemanaEsp(fechaPedida)} ${fechaPedida.slice(8, 10)}. 📍 ${DIR}.`;
+      }
+
+      // Caso 2: pidió agendar sin hora concreta (o día relativo).
+      const fecha = fechaPedida ?? sumarDiasHabiles(1);
+      const ocupadas = await leerOcupadas(fecha);
+      const libres = horariosLibres(ocupadas).slice(0, 2);
+      if (libres.length === 0) return null;
+      return `Claro, ${nombreLead}. Para su cita del ${fechaEsp(fecha)} tengo disponible a las ${libres[0]} o a las ${libres[1]}. ¿Cuál le acomoda? 📍 Estamos en ${DIR}.`;
+    };
+
     try {
       if (botFallo) {
-        await enviarMensajeBot(cierreB);
-        await marcarParaAsesor();
+        // Si se puede agendar por código, hazlo; si no, Cierre B + escalar.
+        const respAgenda = await intentarAgendarDeterminista();
+        if (respAgenda) {
+          await enviarMensajeBot(respAgenda);
+        } else {
+          await enviarMensajeBot(cierreB);
+          await marcarParaAsesor();
+        }
       } else {
         await enviarMensajeBot(botResult.reply!);
         if (botResult.escalate) {
