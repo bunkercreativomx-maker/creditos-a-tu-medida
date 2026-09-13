@@ -261,7 +261,14 @@ async function procesarTurnoBot(args: {
       });
     };
 
-    const cierreB = `Perfecto, ${parsed.nombre ?? ""}. Ya quedó registrada su información. Un asesor se pondrá en contacto con usted lo antes posible para darle todos los detalles. Quedo pendiente por aquí por cualquier cosa. ¡Excelente día!`
+    // Nombre del lead (el que el cliente tecleó), para saludos y cierres.
+    const leadActual = await pb
+      .collection("leads")
+      .getOne(leadId)
+      .catch(() => null);
+    const nombreLead = String(leadActual?.nombre ?? parsed.nombre ?? "").trim();
+
+    const cierreB = `Perfecto, ${nombreLead}. Ya quedó registrada su información. Un asesor se pondrá en contacto con usted lo antes posible para darle todos los detalles. Quedo pendiente por aquí por cualquier cosa. ¡Excelente día!`
       .replace(/\s+/g, " ")
       .trim();
 
@@ -274,17 +281,12 @@ async function procesarTurnoBot(args: {
     // enviar, o null si no aplica (hay que escalar).
     const textoCliente = String(parsed.text ?? "").trim();
     const intentarAgendarDeterminista = async (): Promise<string | null> => {
-      const lead = await pb
-        .collection("leads")
-        .getOne(leadId)
-        .catch(() => null);
-      const nombreLead = String(lead?.nombre ?? "").trim();
       if (!nombreLead) return null;
       if (!pideAgendar(textoCliente)) return null;
 
       // El NSS se pide ANTES de agendar. Si el lead aún no lo tiene, pregunta
       // en lugar de agendar (así el dato no se salta).
-      const nssLead = String(lead?.nss ?? "").trim();
+      const nssLead = String(leadActual?.nss ?? "").trim();
       if (!nssLead) {
         return `Para agilizar su trámite, ${nombreLead}, ¿me puede proporcionar su número de seguro social (NSS)? Con eso agendo su cita. Si no lo tiene a la mano, sin problema, lo puede llevar el día de su cita.`;
       }
@@ -320,14 +322,14 @@ async function procesarTurnoBot(args: {
               // Reagendar: actualiza la cita existente del lead.
               const citaId = (existing as { id: string }[])[0].id;
               await pb.collection("citas").update(citaId, {
-                titulo: `Cita préstamo — ${nombreLead} — ${String(lead?.institucion ?? "")}`,
+                titulo: `Cita préstamo — ${nombreLead} — ${String(leadActual?.institucion ?? "")}`,
                 fecha: iso,
                 notas: `Reagendada por código. Tel: ${telefono}`,
               });
             } else {
               await pb.collection("citas").create({
                 lead: leadId,
-                titulo: `Cita préstamo — ${nombreLead} — ${String(lead?.institucion ?? "")}`,
+                titulo: `Cita préstamo — ${nombreLead} — ${String(leadActual?.institucion ?? "")}`,
                 fecha: iso,
                 tipo: "cita",
                 notas: `Agendada por código (fallback determinista). Tel: ${telefono}`,
@@ -365,10 +367,12 @@ async function procesarTurnoBot(args: {
           await marcarParaAsesor();
         }
       } else {
-        // Turno normal con respuesta del LLM. Pero si el cliente pidió
-        // reagendar y el lead ya tiene una cita, lo forzamos por código (Gemini
-        // suele responder "le reagendo" sin actualizar el calendario).
-        if (pideReagendar(textoCliente)) {
+        // Turno normal con respuesta del LLM. Pero cuando el cliente pide
+        // agendar (hora o día), SIEMPRE forzamos el flujo determinista por
+        // código: así se pide el NSS, se crea/actualiza la cita en el
+        // calendario y se entrega la dirección limpia. Gemini en este turno
+        // se saltaba el NSS e inventaba requisitos/documentos extra.
+        if (pideAgendar(textoCliente) || pideReagendar(textoCliente)) {
           const respAgenda = await intentarAgendarDeterminista();
           if (respAgenda) {
             await enviarMensajeBot(respAgenda);

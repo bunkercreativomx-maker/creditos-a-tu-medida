@@ -16,8 +16,8 @@ export function sanearDireccion(texto: string): string {
   out = out.replace(/📍\s*\*{0,2}[^\n]*/g, `📍 ${DIRECCION_OFICIAL}`);
   // Frase "Estamos ubicados en: <línea>" → anclar la oficial.
   out = out.replace(
-    /(?:ubicad[oa]s?\s+en|estamos\s+en|direcci[oó]n)[:\s]*[^\n]*/gi,
-    (m) => `${m.trim() ? m.match(/^[^:\n]{0,20}/)?.[0] ?? "" : ""} ${DIRECCION_OFICIAL}`
+    /(?:ubicad[oa]s?\s+en|estamos\s+en|nuestra\s+sucursal\s+(?:ubicada\s+)?en|direcci[oó]n)[:\s]*[^\n]*/gi,
+    (m) => `${m.trim() ? m.match(/^[^:\n]{0,24}/)?.[0] ?? "" : ""} ${DIRECCION_OFICIAL}`
   );
   // Patrón de dirección tipo "Calle/Avenida X #N, ... Ciudad"
   out = out.replace(
