@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createServerClient } from "@/lib/pocketbase-server";
-import { notifyNewLead } from "@/lib/push";
+import { notifyNewLead, notifyWebFormNeedsAdvisor } from "@/lib/push";
 import type { LeadStatus, UserRole, OperacionStatus, OperacionTipo, CitaTipo } from "@/lib/types";
 
 /** Registra una acción en la bitácora del lead (historial). */
@@ -61,6 +61,12 @@ export async function createLead(data: Record<string, unknown>) {
     await logAudit(pb, nuevoId, "Lead creado", "Capturado en el pipeline");
     // Notificar a los asesores por push (esperar: serverless congela tras responder)
     await notifyNewLead({
+      nombre: payload.nombre,
+      apellido: payload.apellido,
+      monto_aproximado: payload.monto_aproximado,
+    });
+    // Un lead capturado a mano también requiere atención de asesor.
+    await notifyWebFormNeedsAdvisor({
       nombre: payload.nombre,
       apellido: payload.apellido,
       monto_aproximado: payload.monto_aproximado,

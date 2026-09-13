@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/pocketbase-admin";
-import { notifyNewLead } from "@/lib/push";
+import { notifyNewLead, notifyWebFormNeedsAdvisor } from "@/lib/push";
 import type { LeadOrigen, TipoCredito, Genero, EstadoCivil } from "@/lib/types";
 
 const DOCUMENT_FIELDS = [
@@ -98,6 +98,11 @@ export async function POST(req: NextRequest) {
   // Notificar a los asesores por push (esperar: en serverless el proceso se
   // congela tras responder, un fire-and-forget sin await se corta a mitad).
   await notifyNewLead({
+    nombre: insertPayload.nombre as string | null,
+    apellido: insertPayload.apellido as string | null,
+    monto_aproximado: insertPayload.monto_aproximado as string | null,
+  });
+  await notifyWebFormNeedsAdvisor({
     nombre: insertPayload.nombre as string | null,
     apellido: insertPayload.apellido as string | null,
     monto_aproximado: insertPayload.monto_aproximado as string | null,

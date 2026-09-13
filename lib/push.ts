@@ -92,6 +92,65 @@ export async function notifyNewLead(lead: { nombre?: string | null; apellido?: s
 }
 
 /**
+ * Notifica que llegó un lead del formulario web y REQUIERE la atención inmediata
+ * de un asesor (estos leads no pasan por el bot — no hay precalificación ni
+ * conversación WhatsApp, llegan directo y hay que atenderlos para que no se
+ * escapen). Fire-and-forget: nunca lanza errores.
+ */
+export async function notifyWebFormNeedsAdvisor(lead: {
+  nombre?: string | null;
+  apellido?: string | null;
+  monto_aproximado?: string | null;
+}) {
+  try {
+    const { createAdminClient } = await import("@/lib/pocketbase-admin");
+    const pb = await createAdminClient();
+    const subs = await pb.collection("push_subscriptions").getFullList();
+    if (subs.length === 0) return;
+
+    const toStr = (v: unknown) =>
+      typeof v === "string"
+        ? v
+        : v && typeof v === "object"
+          ? String((v as { name?: unknown }).name ?? "")
+          : v
+            ? String(v)
+            : "";
+    const nombre =
+      [toStr(lead.nombre), toStr(lead.apellido)].filter(Boolean).join(" ") ||
+      "Cliente del formulario";
+    const monto = lead.monto_aproximado ? ` · ${toStr(lead.monto_aproximado)}` : "";
+    const title = "🔔 Nuevo lead del formulario — requiere asesor";
+    const body = `${nombre}${monto} envió su solicitud por la web y está esperando a un asesor.`;
+
+    // Badge = leads sin atender (status nuevo).
+    let badge = 1;
+    try {
+      const res = await pb.collection("leads").getList(1, 1, {
+        filter: `status = "nuevo"`,
+      });
+      badge = Math.max(res.totalItems, 1);
+    } catch {
+      badge = 1;
+    }
+
+    const dead: string[] = [];
+    for (const s of subs) {
+      const ok = await sendPush(
+        { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+        { title, body, url: "/crm", badge }
+      );
+      if (!ok) dead.push(s.id);
+    }
+    for (const id of dead) {
+      await pb.collection("push_subscriptions").delete(id).catch(() => {});
+    }
+  } catch (err) {
+    console.error("notifyWebFormNeedsAdvisor:", err);
+  }
+}
+
+/**
  * Notifica a todos los dispositivos registrados que el bot terminó de calificar
  * una conversación y ya necesita la atención de un asesor (se escaló a humano).
  * Fire-and-forget: nunca lanza errores que rompan el flujo principal.
