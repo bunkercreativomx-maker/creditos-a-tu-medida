@@ -54,16 +54,21 @@ export default async function CrmLayout({ children }: { children: React.ReactNod
   // Leads del formulario web sin atender (origen web_form, status nuevo).
   // NO crean conversación WhatsApp, así que no caen en conversacionesParaAsesor;
   // se cuentan aparte para que también aparezcan en el aviso "necesita asesor".
-  let leadsWebParaAsesor = 0;
+  let leadsWebParaAsesor: { id: string; nombre: string; telefono: string }[] = [];
   try {
     const res = await pb
       .collection("leads")
-      .getList(1, 1, { filter: `origen = "web_form" && status = "nuevo"` });
-    leadsWebParaAsesor = res.totalItems;
+      .getList(1, 50, { filter: `origen = "web_form" && status = "nuevo"` });
+    leadsWebParaAsesor = (res.items ?? []).map((l) => ({
+      id: String(l.id),
+      nombre: String(l.nombre ?? "").trim() || "Sin nombre",
+      telefono: String(l.telefono ?? ""),
+    }));
   } catch {
-    leadsWebParaAsesor = 0;
+    leadsWebParaAsesor = [];
   }
-  const totalParaAsesor = conversacionesParaAsesor + leadsWebParaAsesor;
+  const conversacionesParaAsesorCount = conversacionesParaAsesor;
+  const totalParaAsesor = conversacionesParaAsesorCount + leadsWebParaAsesor.length;
 
   const fullName = (user as { full_name?: string }).full_name
     ?? (user as { name?: string }).name
@@ -77,6 +82,7 @@ export default async function CrmLayout({ children }: { children: React.ReactNod
         role={user.role ?? "asesor"}
         leadsNuevosHoy={leadsNuevosHoy}
         conversacionesParaAsesor={totalParaAsesor}
+        leadsWebParaAsesor={leadsWebParaAsesor}
       />
       <main className="flex-1 px-4 py-6 sm:px-6">{children}</main>
     </div>

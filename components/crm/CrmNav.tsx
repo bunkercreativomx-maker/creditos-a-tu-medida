@@ -17,7 +17,7 @@ const TABS = [
   { href: "/crm/vendedores", label: "Vendedores", icon: "👥" },
 ];
 
-export function CrmNav({ fullName, role, leadsNuevosHoy, conversacionesParaAsesor }: { fullName: string; role: string; leadsNuevosHoy?: number; conversacionesParaAsesor?: number }) {
+export function CrmNav({ fullName, role, leadsNuevosHoy, conversacionesParaAsesor, leadsWebParaAsesor }: { fullName: string; role: string; leadsNuevosHoy?: number; conversacionesParaAsesor?: number; leadsWebParaAsesor?: { id: string; nombre: string; telefono: string }[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -150,8 +150,19 @@ export function CrmNav({ fullName, role, leadsNuevosHoy, conversacionesParaAseso
                 {conversacionesParaAsesor}
               </span>{" "}
               {conversacionesParaAsesor === 1
-                ? "solicitud lista y espera a un asesor"
-                : "solicitudes listas y esperan a un asesor"}
+                ? "solicitud espera a un asesor:"
+                : "solicitudes esperan a un asesor:"}
+              {leadsWebParaAsesor && leadsWebParaAsesor.length > 0 && (
+                <span className="ml-1 font-normal">
+                  {leadsWebParaAsesor.map((l, i) => (
+                    <span key={l.id}>
+                      {i > 0 && ", "}
+                      <span className="font-semibold">{l.nombre}</span>
+                      {l.telefono && <span className="text-amber-700"> ({l.telefono})</span>}
+                    </span>
+                  ))}
+                </span>
+              )}
             </span>
             <span className="ml-auto text-xs text-amber-600">Atender →</span>
           </Link>
