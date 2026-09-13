@@ -75,6 +75,58 @@ async function procesarTurnoBot(args: {
           : m.contenido,
       }));
 
+    // SALUDO FIJO en el primer turno: el LLM alucina el nombre comercial
+    // (CrediFiel, Financiera Más, Préstamos Ciudad Juárez, etc.), así que el
+    // primer mensaje del bot NO pasa por el modelo — es un texto controlado
+    // con el nombre real. Solo cuando ya hay historial (mensajes previos del
+    // bot) corre el turno con Gemini.
+    const esPrimerTurno =
+      !(recentMessages.items ?? []).some(
+        (m) => (m as { remitente?: string }).remitente === "bot"
+      );
+    if (esPrimerTurno) {
+      const saludo =
+        "¡Hola! Buen día 👋 Le saluda Créditos a tu medida. Con gusto le ayudo con su información de préstamo. ¿Me regala su nombre completo, por favor?";
+      await pb.collection("messages").create({
+        conversation: conversationId,
+        remitente: "bot",
+        contenido: saludo,
+        created: new Date().toISOString(),
+      });
+      if (pbConversationId && pbAccountId) {
+        try {
+          await sendWhatsAppMessage(pbConversationId, pbAccountId, saludo);
+        } catch (e) {
+          // Si el envío falla, entregamos la conversación a un asesor para que
+          // nadie se quede sin respuesta (el saludo ya quedó persistido).
+          console.error("[webhook] fallo enviando saludo fijo:", e);
+          await pb
+            .collection("conversations")
+            .update(conversationId, { bot_activo: false, necesita_asesor: true })
+            .catch(() => {});
+          await pb
+            .collection("leads")
+            .update(leadId, { status: "en_seguimiento" })
+            .catch(() => {});
+        }
+      }
+      // Primer contacto: notificar que llegó un lead nuevo (best-effort).
+      if (esLeadNuevo) {
+        await notifyNewLeadToSlack({
+          nombre: parsed.nombre ?? null,
+          telefono,
+          origen: "whatsapp",
+          leadId,
+        }).catch(() => {});
+        await notifyNewLead({
+          nombre: parsed.nombre ?? null,
+          apellido: null,
+          monto_aproximado: null,
+        }).catch(() => {});
+      }
+      return;
+    }
+
     const botResult = await runBotTurn(history, {
       // Fecha/hora REAL de Cd. Juárez inyectada como contexto: evita que el bot
       // invente fechas para "mañana"/"la próxima semana" (BLOQUE 7).
