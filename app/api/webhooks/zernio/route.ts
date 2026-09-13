@@ -18,12 +18,14 @@ import {
   fechaEsp,
   extraerHora,
   pideAgendar,
+  pideReagendar,
   detectarDia,
   horariosLibres,
+  horaLocalAUtc,
 } from "@/lib/agenda";
+import { sanearDireccion } from "@/lib/direccion";
 
-// El trabajo pesado (LLM + envío) corre DESPUÉS de responder a Zernio (after()),
-// así que este tope cubre ese trabajo en segundo plano.
+// El trabajo pesado (LLM + envío) corre DESPUÉS de responder a Zernio (after()).
 export const maxDuration = 60;
 
 // Allowlist: SOLO procesa mensajes de la cuenta WhatsApp de Créditos.
@@ -199,19 +201,37 @@ async function procesarTurnoBot(args: {
     if (botResult.cita) {
       const fecha = botResult.cita.fecha;
       const hora = botResult.cita.hora || "12:00";
-      const iso = `${fecha}T${hora.length === 5 ? hora : "12:00"}:00`;
+      // La hora que llega es LOCAL de Cd. Juárez; se convierte a UTC para que
+      // el calendario la muestre bien (antes se guardaba como si fuera UTC y
+      // una cita de las 10:00 aparecía a las 4:00 am).
+      const iso = horaLocalAUtc(fecha, hora.length === 5 ? hora : "12:00");
       try {
-        await pb.collection("citas").create({
-          lead: leadId,
-          titulo: botResult.cita.titulo || `Cita préstamo — ${parsed.nombre ?? ""}`,
-          fecha: iso,
-          tipo: "cita",
-          notas: botResult.cita.notas ?? null,
-          asignado_a: null,
-        });
+        // Si el lead ya tiene una cita (reagendar), actualízala en vez de
+        // crear un duplicado; si no, crea la cita.
+        const existing = await pb
+          .collection("citas")
+          .getFullList({ filter: `lead = "${leadId}"` })
+          .catch(() => [] as unknown as { id: string }[]);
+        if ((existing as { id: string }[]).length > 0) {
+          const citaId = (existing as { id: string }[])[0].id;
+          await pb.collection("citas").update(citaId, {
+            titulo: botResult.cita.titulo || `Cita préstamo — ${parsed.nombre ?? ""}`,
+            fecha: iso,
+            notas: botResult.cita.notas ?? null,
+          });
+        } else {
+          await pb.collection("citas").create({
+            lead: leadId,
+            titulo: botResult.cita.titulo || `Cita préstamo — ${parsed.nombre ?? ""}`,
+            fecha: iso,
+            tipo: "cita",
+            notas: botResult.cita.notas ?? null,
+            asignado_a: null,
+          });
+        }
       } catch (err) {
         // No rompas la respuesta si falla el calendario; se loguea.
-        console.error("Error creando cita:", err);
+        console.error("Error creando/actualizando cita:", err);
       }
     }
 
@@ -228,11 +248,14 @@ async function procesarTurnoBot(args: {
 
     const enviarMensajeBot = async (texto: string) => {
       if (!pbConversationId || !pbAccountId) throw new Error("sin destino para enviar");
-      await sendWhatsAppMessage(pbConversationId, pbAccountId, texto);
+      // Sanea la dirección: Gemini la inventa en el texto libre; se reemplaza
+      // cualquier dirección que no sea la oficial por la real.
+      const textoLimpio = sanearDireccion(texto);
+      await sendWhatsAppMessage(pbConversationId, pbAccountId, textoLimpio);
       await pb.collection("messages").create({
         conversation: conversationId,
         remitente: "bot",
-        contenido: texto,
+        contenido: textoLimpio,
         created: new Date().toISOString(),
       });
     };
@@ -276,18 +299,33 @@ async function procesarTurnoBot(args: {
       if (horaPedida && fechaPedida) {
         const ocupadas = await leerOcupadas(fechaPedida);
         if (!ocupadas.includes(horaPedida)) {
-          const iso = `${fechaPedida}T${horaPedida}:00`;
+          // Hora local → UTC (evita que una cita de las 10:00 salga a las 4:00am).
+          const iso = horaLocalAUtc(fechaPedida, horaPedida);
           try {
-            await pb.collection("citas").create({
-              lead: leadId,
-              titulo: `Cita préstamo — ${nombreLead} — ${String(lead?.institucion ?? "")}`,
-              fecha: iso,
-              tipo: "cita",
-              notas: `Agendada por código (fallback determinista). Tel: ${telefono}`,
-              asignado_a: null,
-            });
+            const existing = await pb
+              .collection("citas")
+              .getFullList({ filter: `lead = "${leadId}"` })
+              .catch(() => [] as unknown as { id: string }[]);
+            if ((existing as { id: string }[]).length > 0) {
+              // Reagendar: actualiza la cita existente del lead.
+              const citaId = (existing as { id: string }[])[0].id;
+              await pb.collection("citas").update(citaId, {
+                titulo: `Cita préstamo — ${nombreLead} — ${String(lead?.institucion ?? "")}`,
+                fecha: iso,
+                notas: `Reagendada por código. Tel: ${telefono}`,
+              });
+            } else {
+              await pb.collection("citas").create({
+                lead: leadId,
+                titulo: `Cita préstamo — ${nombreLead} — ${String(lead?.institucion ?? "")}`,
+                fecha: iso,
+                tipo: "cita",
+                notas: `Agendada por código (fallback determinista). Tel: ${telefono}`,
+                asignado_a: null,
+              });
+            }
           } catch (err) {
-            console.error("[webhook] error creando cita determinista:", err);
+            console.error("[webhook] error creando/actualizando cita determinista:", err);
             return null;
           }
           return `¡Listo, ${nombreLead}! Su cita queda confirmada: 📅 ${fechaEsp(fechaPedida)} a las ${horaPedida} 📍 ${DIR}. Un asesor lo estará esperando. Si necesita cambiar la cita, solo escríbame por aquí.`;
@@ -317,6 +355,16 @@ async function procesarTurnoBot(args: {
           await marcarParaAsesor();
         }
       } else {
+        // Turno normal con respuesta del LLM. Pero si el cliente pidió
+        // reagendar y el lead ya tiene una cita, lo forzamos por código (Gemini
+        // suele responder "le reagendo" sin actualizar el calendario).
+        if (pideReagendar(textoCliente)) {
+          const respAgenda = await intentarAgendarDeterminista();
+          if (respAgenda) {
+            await enviarMensajeBot(respAgenda);
+            return;
+          }
+        }
         await enviarMensajeBot(botResult.reply!);
         if (botResult.escalate) {
           await marcarParaAsesor();

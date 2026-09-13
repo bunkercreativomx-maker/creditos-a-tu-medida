@@ -94,6 +94,68 @@ export function extraerHora(texto: string): string | null {
   return `${String(h).padStart(2, "0")}:${min}`;
 }
 
+/**
+ * Offset UTC (en minutos) de la zona America/Ciudad_Juarez para una fecha dada.
+ * Cd. Juárez usa horario de verano (CDT, UTC-6) en verano y MST (UTC-7) en
+ * invierno, así que el offset depende de la fecha, no es fijo.
+ */
+export function offsetJuarezMin(fechaIso: string): number {
+  const d = new Date(`${fechaIso}T12:00:00Z`);
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Ciudad_Juarez",
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  const parts = Object.fromEntries(
+    fmt
+      .formatToParts(d)
+      .filter((p) => p.type !== "literal")
+      .map((p) => [p.type, p.value])
+  );
+  const asUtc = Date.UTC(
+    +parts.year,
+    +parts.month - 1,
+    +parts.day,
+    (+parts.hour) % 24,
+    +parts.minute,
+    +parts.second
+  );
+  return (asUtc - d.getTime()) / 60000; // + si la zona está detrás de UTC
+}
+
+/**
+ * Convierte una fecha YYYY-MM-DD y hora local HH:MM (Cd. Juárez) al ISO UTC.
+ * Ej: "2026-09-14" + "10:00" → "2026-09-14T16:00:00Z" (verano, UTC-6).
+ * Esto evita que el calendario muestre la cita a las 4:00 am cuando el cliente
+ * pidió las 10:00 (la hora local se guardaba como si fuera UTC).
+ */
+export function horaLocalAUtc(fechaIso: string, horaHHMM: string): string {
+  const hh = parseInt(horaHHMM.slice(0, 2), 10);
+  const mm = parseInt(horaHHMM.slice(3, 5), 10) || 0;
+  const offset = offsetJuarezMin(fechaIso); // ej. -360 (UTC-6)
+  // local = utc + offset  →  utc = local - offset
+  const utcMs = Date.UTC(
+    +fechaIso.slice(0, 4),
+    +fechaIso.slice(5, 7) - 1,
+    +fechaIso.slice(8, 10),
+    hh,
+    mm,
+    0
+  ) - offset * 60000;
+  return new Date(utcMs).toISOString();
+}
+
+/** ¿El texto pide reagendar/cambiar una cita existente? */
+export function pideReagendar(texto: string): boolean {
+  const t = (texto || "").toLowerCase();
+  return /(reagendar|re-agendar|reagenda|cambiar (mi )?cita|cambiar (mi )?hora|mover (la )?cita|otra hora|otro d[ií]a|m[aá]s tarde|adelantar|atrasar|no puedo|me queda mal|cancelar)/.test(t);
+}
+
 /** ¿El texto pide agendar / menciona un día u hora? */
 export function pideAgendar(texto: string): boolean {
   const t = (texto || "").toLowerCase();
