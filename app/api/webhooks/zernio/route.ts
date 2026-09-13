@@ -295,12 +295,14 @@ async function procesarTurnoBot(args: {
           .filter(Boolean) as string[];
       };
 
-      // Caso 1: el cliente dio una hora concreta para un día.
-      if (horaPedida && fechaPedida) {
-        const ocupadas = await leerOcupadas(fechaPedida);
+      // Caso 1: el cliente dio una hora concreta (con o sin día).
+      if (horaPedida) {
+        // Si no especificó día, usa el que pidió antes o el próximo día hábil.
+        const fecha = fechaPedida ?? sumarDiasHabiles(1);
+        const ocupadas = await leerOcupadas(fecha);
         if (!ocupadas.includes(horaPedida)) {
           // Hora local → UTC (evita que una cita de las 10:00 salga a las 4:00am).
-          const iso = horaLocalAUtc(fechaPedida, horaPedida);
+          const iso = horaLocalAUtc(fecha, horaPedida);
           try {
             const existing = await pb
               .collection("citas")
@@ -328,12 +330,12 @@ async function procesarTurnoBot(args: {
             console.error("[webhook] error creando/actualizando cita determinista:", err);
             return null;
           }
-          return `¡Listo, ${nombreLead}! Su cita queda confirmada: 📅 ${fechaEsp(fechaPedida)} a las ${horaPedida} 📍 ${DIR}. Un asesor lo estará esperando. Si necesita cambiar la cita, solo escríbame por aquí.`;
+          return `¡Listo, ${nombreLead}! Su cita queda confirmada: 📅 ${fechaEsp(fecha)} a las ${horaPedida} 📍 ${DIR}. Un asesor lo estará esperando. Si necesita cambiar la cita, solo escríbame por aquí.`;
         }
         // La hora pedida está ocupada → proponer alternativas.
         const libres = horariosLibres(ocupadas).slice(0, 2);
         if (libres.length === 0) return null;
-        return `A esa hora ya está apartado. Le puedo ofrecer las ${libres[0]} o las ${libres[1]} el ${diaSemanaEsp(fechaPedida)} ${fechaPedida.slice(8, 10)}. 📍 ${DIR}.`;
+        return `A esa hora ya está apartado. Le puedo ofrecer las ${libres[0]} o las ${libres[1]} el ${diaSemanaEsp(fecha)} ${fecha.slice(8, 10)}. 📍 ${DIR}.`;
       }
 
       // Caso 2: pidió agendar sin hora concreta (o día relativo).
