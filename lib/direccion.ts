@@ -1,7 +1,9 @@
-// Dirección oficial (única fuente de verdad). Gemini la alucina en el texto
-// libre del turno normal; esta constante y el saneo se usan en el webhook.
-export const DIRECCION_OFICIAL =
-  "Benjamín Franklin 3220, Local 22D, Plaza de las Américas, Zona Pronaf, C.P. 32315, Cd. Juárez, Chihuahua";
+// Dirección oficial (única fuente de verdad: lib/politicas.ts). Gemini la
+// alucina en el texto libre del turno normal; esta constante y el saneo se usan
+// en el webhook.
+import { DIRECCION_OFICIAL } from "@/lib/politicas";
+
+export { DIRECCION_OFICIAL };
 
 /**
  * Reemplaza cualquier dirección que Gemini haya inventado por la oficial.

@@ -3,7 +3,14 @@
 // veces se queda sin respuesta; el fallback anti-silencio mandaba el Cierre B
 // y escalaba SIN crear la cita. Aquí el webhook agenda por código, sin LLM.
 
-const TZ = "America/Ciudad_Juarez";
+import {
+  ZONA_HORARIA,
+  HORARIOS_LUN_VIE as _HORARIOS_LUN_VIE,
+  HORARIOS_SABADO as _HORARIOS_SABADO,
+  HORARIOS_DOMINGO as _HORARIOS_DOMINGO,
+} from "@/lib/politicas";
+
+const TZ = ZONA_HORARIA;
 
 /** Fecha actual en Cd. Juárez como { yyyy, mm, dd, iso, weekday, hora }. */
 export function hoyJuarez(): {
@@ -69,17 +76,17 @@ export function fechaEsp(fechaIso: string): string {
 
 /** Horarios hábiles entre semana (lun-vie), hasta las 17:00. */
 export function HORARIOS_BASE(): string[] {
-  return ["09:00", "10:00", "11:00", "12:00", "13:00", "15:00", "16:00", "17:00"];
+  return [..._HORARIOS_LUN_VIE];
 }
 
 /** Horarios de sábado (hasta las 14:00). */
 export function HORARIOS_SABADO(): string[] {
-  return ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00"];
+  return [..._HORARIOS_SABADO];
 }
 
 /** Horarios de domingo (solo con cita; horario reducido 10:00–14:00). */
 export function HORARIOS_DOMINGO(): string[] {
-  return ["10:00", "11:00", "12:00", "13:00", "14:00"];
+  return [..._HORARIOS_DOMINGO];
 }
 
 /**
@@ -111,17 +118,49 @@ export function recortarHorasPasadas(libres: string[], horaActualHHMM: string): 
   return libres.filter((h) => h > horaActualHHMM);
 }
 
-/** Extrae una hora HH:MM mencionada en un texto ("a las 10", "10:00", "las 11"). */
+/** Extrae una hora HH:MM mencionada en un texto ("a las 10", "5 de la tarde"). */
 export function extraerHora(texto: string): string | null {
-  const m = texto.match(/(\d{1,2})(?::(\d{2}))?\s*(a\.?\s*m\.?|p\.?\s*m\.?)?/i);
+  const t = String(texto ?? "").toLowerCase();
+  // \b + (?![\d,.]) evita confundir montos con horas: "10000" o "10,000" NO
+  // son "10:00" (antes "15,000 pesos" agendaba una cita a las 3 de la tarde).
+  const m = t.match(
+    /\b(\d{1,2})(?::(\d{2}))?(?![\d,.])(?:\s*(a\.?\s*m\.?|p\.?\s*m\.?|de la (mañana|tarde|noche|madrugada)|del (día|dia|mediodía|mediodia)|hrs?\.?|horas?))?/
+  );
   if (!m) return null;
   let h = parseInt(m[1], 10);
-  if (h < 1 || h > 12) return null;
+  if (Number.isNaN(h)) return null;
   const min = m[2] ? m[2].padStart(2, "0") : "00";
-  const meridiem = (m[3] || "").toLowerCase();
-  if (meridiem.includes("p") && h < 12) h += 12;
-  else if (meridiem.includes("a") && h === 12) h = 0;
+  const sufijo = (m[3] || "").toLowerCase();
+  const esPm = /p\.?\s*m/.test(sufijo) || /tarde|noche/.test(sufijo);
+  const esAm = /a\.?\s*m/.test(sufijo) || /mañana|madrugada/.test(sufijo) || /mediod/.test(sufijo);
+  let ajustado = false;
+  if (esPm && h < 12) {
+    h += 12;
+    ajustado = true;
+  } else if (esAm && h === 12 && /madrugada/.test(sufijo)) h = 0;
+  // Sin a.m./p.m., una hora de 1 a 7 es de la tarde: nadie cita a las 5 de la
+  // mañana ("a las 2" → 14:00, "a las 5" → 17:00).
+  else if (!esAm && !esPm && h <= 7) {
+    h += 12;
+    ajustado = true;
+  }
+  // Un número mayor a 12 sin sufijo ni ":minutos" es una fecha, no una hora
+  // ("el 14 de septiembre"): no se agenda. (Se exceptúa lo ya interpretado
+  // como hora de la tarde, ej. "a las 2".)
+  if (h > 12 && !sufijo && !m[2] && !ajustado) return null;
+  if (h < 8 || h > 20) return null;
   return `${String(h).padStart(2, "0")}:${min}`;
+}
+
+/**
+ * ¿La hora cae dentro del horario de atención del día? Lun-Vie 9:00-17:00,
+ * Sáb 9:00-14:00, Dom 10:00-14:00. Sirve para NO agendar (ni contestar "esa
+ * hora ya pasó") cuando el cliente dice una hora en la que no abrimos.
+ */
+export function horaEnHorarioDia(fechaIso: string, horaHHMM: string): boolean {
+  const slots = horariosParaDia(fechaIso);
+  if (slots.length === 0) return false;
+  return horaHHMM >= slots[0] && horaHHMM <= slots[slots.length - 1];
 }
 
 /**
@@ -191,13 +230,11 @@ export function pareceIdentificador(texto: string): boolean {
   return false;
 }
 
-/**
- * ¿El texto pregunta por la ubicación o la dirección?
+/*
+ * ¿Pregunta por la ubicación? → vive en lib/intenciones.ts (versión amplia:
+ * "a dónde tengo que ir", "en qué parte están", "me manda la ubicacion?").
+ * Se importa desde ahí para que exista UNA sola versión del detector.
  */
-export function pideUbicacion(texto: string): boolean {
-  const t = (texto || "").toLowerCase();
-  return /(ubicad|direcci[oó]n|d[oó]nde est|donde est|localiza|sucursal|c[oó]mo llego|como llego|domicilio)/.test(t);
-}
 
 /** ¿El texto pide reagendar/cambiar una cita existente? */
 export function pideReagendar(texto: string): boolean {
@@ -211,7 +248,11 @@ export function pideReagendar(texto: string): boolean {
  * preguntó la hora y el cliente contesta con un número suelto.
  */
 export function pareceHoraODia(texto: string): boolean {
-  const t = (texto || "").trim().toLowerCase();
+  const t = String(texto ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
   if (!t) return false;
   // Número suelto (1-2 dígitos) o con am/pm, ej. "10", "10 am", "4pm", "11:30".
   if (/^\d{1,2}(\s*(:\d{2})?)\s*(a\.?\s*m\.?|p\.?\s*m\.?)?$/.test(t)) return true;
@@ -224,8 +265,13 @@ export function pareceHoraODia(texto: string): boolean {
 
 /** ¿El texto pide agendar / menciona un día u hora? */
 export function pideAgendar(texto: string): boolean {
-  const t = (texto || "").toLowerCase();
-  return /(agendar|agenda|agendarme|cita|horario|qué día|que día|mañana|pasado mañana|lo antes posible|lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|a las \d|:\d\d)/.test(t);
+  const t = String(texto ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  return /(agendar|agenda|agendarme|cita|horario|que dia|que dias|cuando puedo|puedo ir|puedo pasar|quiero ir|me gustaria ir|paso por|hay lugar|hay espacio|disponibilidad|manana|pasado manana|lunes|martes|miercoles|jueves|viernes|sabado|domingo|a las \d|:\d\d|de la tarde|de la manana)/.test(
+    t
+  );
 }
 
 /** Suma n días de calendario a partir de hoy (sin saltar domingos). */
@@ -250,23 +296,27 @@ export function proximoLunes(): string {
 
 /** Detecta el día pedido en el texto → fecha YYYY-MM-DD (día de calendario). */
 export function detectarDia(texto: string): string | null {
-  const t = (texto || "").toLowerCase();
+  // Sin acentos: "manana", "miercoles" y "sabado" se escriben así en WhatsApp.
+  const t = String(texto ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
   const hoy = hoyJuarez();
   if (/hoy/.test(t)) return hoy.iso;
-  if (/pasado mañana/.test(t)) return sumarDiasCalendario(2);
-  if (/mañana/.test(t)) return sumarDiasCalendario(1);
-  const dias = [
-    ["lunes", 1],
-    ["martes", 2],
-    ["mi[ée]rcoles", 3],
-    ["jueves", 4],
-    ["viernes", 5],
-    ["s[aá]bado", 6],
-    ["domingo", 0],
-  ] as const;
+  if (/pasado\s+manana/.test(t)) return sumarDiasCalendario(2);
+  if (/manana/.test(t)) return sumarDiasCalendario(1);
+  const dias: [RegExp, number][] = [
+    [/\blunes\b|\blun\b/, 1],
+    [/\bmartes\b|\bmar\b/, 2],
+    [/\bmiercoles\b|\bmie\b/, 3],
+    [/\bjueves\b|\bjue\b/, 4],
+    [/\bviernes\b|\bvie\b/, 5],
+    [/\bsabado\b|\bsab\b/, 6],
+    [/\bdomingo\b|\bdom\b/, 0],
+  ];
   const hoyWD = new Date(`${hoy.iso}T12:00:00Z`).getUTCDay();
   for (const [pat, objetivo] of dias) {
-    if (new RegExp(pat).test(t)) {
+    if (pat.test(t)) {
       // Próximo día de calendario con ese weekday (hoy cuenta si ya es ese día).
       let diff = (objetivo - hoyWD + 7) % 7;
       if (diff === 0) diff = 7; // si ya es ese día, el siguiente igual

@@ -1,0 +1,26 @@
+# CI del bot de WhatsApp (Créditos a tu medida)
+#
+# Corre los tests end-to-end del handler real (node --test + loader de alias) y
+# el typecheck de TypeScript en cada push y PR. Sin estos verdes no se publica.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Type check
+        run: npm run typecheck
+      - name: Tests (handler real + clasificadores)
+        run: npm test
+      - name: Build
+        run: npm run build

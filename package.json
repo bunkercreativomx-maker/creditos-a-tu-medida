@@ -6,7 +6,9 @@
     "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import ./tests/loader.mjs --test \"tests/*.mts\""
   },
   "dependencies": {
     "framer-motion": "^11.15.0",

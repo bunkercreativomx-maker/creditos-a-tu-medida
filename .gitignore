@@ -24,6 +24,10 @@
 .DS_Store
 *.pem
 
+# investigación con PII/exageraciones — NO publicar (ver docs plan-bot-2026)
+docs/plan-bot-2026.md
+docs/plan-bot-2026.html
+
 # debug
 npm-debug.log*
 yarn-debug.log*
