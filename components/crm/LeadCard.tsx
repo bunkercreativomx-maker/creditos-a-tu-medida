@@ -91,6 +91,15 @@ export function LeadCard({
           {lead.telefono}
         </div>
 
+        {/* Aviso parpadeante: lead del formulario web sin atender → necesita asesor */}
+        {lead.origen === "web_form" && lead.status === "nuevo" && (
+          <div className="mt-2">
+            <span className="inline-flex animate-pulse items-center gap-1 rounded-full bg-amber-500 px-2.5 py-1 text-[10px] font-bold text-white shadow-sm">
+              ⚠️ Necesita asesor
+            </span>
+          </div>
+        )}
+
         {lead.producto_interes && (
           <div className="mt-1.5 text-xs text-slate-400">{lead.producto_interes}</div>
         )}
