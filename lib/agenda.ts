@@ -200,6 +200,18 @@ export function sumarDiasCalendario(dias: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+/**
+ * Próximo lunes (inicio de semana) a partir de hoy. Si hoy es lunes, devuelve
+ * hoy. Es el día por defecto para ofrecer citas cuando el cliente no especifica
+ * día — los fines de semana solo se agendan si el cliente los pide.
+ */
+export function proximoLunes(): string {
+  const { iso } = hoyJuarez();
+  const hoyWD = new Date(`${iso}T12:00:00Z`).getUTCDay();
+  const diff = hoyWD === 1 ? 0 : (8 - hoyWD) % 7;
+  return sumarDiasCalendario(diff);
+}
+
 /** Detecta el día pedido en el texto → fecha YYYY-MM-DD (día de calendario). */
 export function detectarDia(texto: string): string | null {
   const t = (texto || "").toLowerCase();

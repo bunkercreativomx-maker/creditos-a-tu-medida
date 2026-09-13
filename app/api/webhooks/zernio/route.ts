@@ -13,8 +13,7 @@ import { createAdminClient } from "@/lib/pocketbase-admin";
 import { notifyNewLeadToSlack } from "@/lib/slack-notify";
 import { notifyNewLead, notifyNeedsAdvisor } from "@/lib/push";
 import {
-  sumarDiasHabiles,
-  sumarDiasCalendario,
+  proximoLunes,
   diaSemanaEsp,
   fechaEsp,
   extraerHora,
@@ -330,7 +329,7 @@ async function procesarTurnoBot(args: {
 
       // Caso 1: el cliente dio una hora concreta (con o sin día).
       if (horaPedida) {
-        const fecha = fechaPedida ?? (horaPedida > hoy.hora && hoy.iso ? hoy.iso : sumarDiasHabiles(1));
+        const fecha = fechaPedida ?? proximoLunes();
         // Si el día es hoy, no aceptar una hora ya pasada.
         if (fecha === hoy.iso && horaPedida <= hoy.hora) {
           const ocupadas = await leerOcupadas(fecha);
@@ -377,8 +376,9 @@ async function procesarTurnoBot(args: {
         return `A esa hora ya está apartado. Le puedo ofrecer las ${libres[0]} o las ${libres[1]} el ${diaSemanaEsp(fecha)} ${fecha.slice(8, 10)}. 📍 ${DIR}.`;
       }
 
-      // Caso 2: pidió agendar sin hora concreta (o día relativo).
-      const fecha = fechaPedida ?? sumarDiasHabiles(1);
+      // Caso 2: pidió agendar sin hora concreta ni día → por defecto el lunes
+      // (inicio de semana). Fin de semana solo si el cliente lo pidió.
+      const fecha = fechaPedida ?? proximoLunes();
       const ocupadas = await leerOcupadas(fecha);
       const libres = filtrarLibres(horariosLibres(ocupadas, fecha), fecha);
       if (libres.length === 0) return null;
