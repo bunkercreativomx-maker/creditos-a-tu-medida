@@ -54,6 +54,7 @@ export type PbLead = {
   origen: LeadOrigen;
   status: LeadStatus;
   asignado_a: string | null;
+  archivado?: boolean | null;
   vencimiento_documentos: string | null;
   // Campos file (documentos) — guardan el nombre del archivo en PB
   ine_frente: string | null;

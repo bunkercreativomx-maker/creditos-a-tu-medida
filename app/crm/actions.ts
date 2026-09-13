@@ -99,6 +99,22 @@ export async function updateLead(leadId: string, data: Record<string, unknown>) 
   revalidatePath(`/crm/leads/${leadId}`);
 }
 
+/**
+ * Archiva o desarchiva un lead. Archivado = oculto del pipeline por defecto,
+ * pero conserva TODOS sus datos, notas, citas e historial. Cuando el cliente
+ * vuelve a escribir, el webhook lo desarchiva automáticamente.
+ */
+export async function archivarLead(leadId: string, archivado: boolean) {
+  const pb = await createServerClient();
+  const user = pb.authStore.model as { id?: string } | null;
+  if (!user?.id) throw new Error("No autenticado");
+  await pb.collection("leads").update(leadId, { archivado });
+  await logAudit(pb, leadId, archivado ? "Lead archivado" : "Lead desarchivado");
+  revalidatePath("/crm");
+  revalidatePath("/crm/pipeline");
+  revalidatePath(`/crm/leads/${leadId}`);
+}
+
 export async function claimLead(leadId: string) {
   const pb = await createServerClient();
   const user = pb.authStore.model as { id?: string; full_name?: string; name?: string; email?: string } | null;

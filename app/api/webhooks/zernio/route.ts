@@ -62,8 +62,9 @@ async function procesarTurnoBot(args: {
   leadId: string;
   conversationId: string;
   esLeadNuevo: boolean;
+  esRecurrente?: boolean;
 }) {
-  const { pb, parsed, telefono, leadId, conversationId, esLeadNuevo } = args;
+  const { pb, parsed, telefono, leadId, conversationId, esLeadNuevo, esRecurrente } = args;
   const pbConversationId = parsed.conversationId;
   const pbAccountId = parsed.accountId;
 
@@ -98,9 +99,28 @@ async function procesarTurnoBot(args: {
       !(recentMessages.items ?? []).some(
         (m) => (m as { remitente?: string }).remitente === "bot"
       );
-    if (esPrimerTurno) {
+    // Sesión nueva: primera vez, O el cliente vuelve después de un buen rato
+    // (>6h) — ahí lo reconocemos por su nombre aunque ya haya historial.
+    let esSesionNueva = esPrimerTurno;
+    if (!esPrimerTurno && esRecurrente) {
+      const items = (recentMessages.items ?? []) as unknown as { created?: string }[];
+      const ultimo = items
+        .map((m) => (m.created ? new Date(m.created).getTime() : 0))
+        .reduce((a, b) => Math.max(a, b), 0);
+      if (ultimo && Date.now() - ultimo > 6 * 60 * 60 * 1000) esSesionNueva = true;
+    }
+    if (esSesionNueva) {
+      // Si el cliente es recurrente (ya lo conocíamos por su número), lo
+      // saludamos por su nombre y reconocemos que ya tenemos sus datos.
+      let nombreCliente = "";
+      if (esRecurrente) {
+        const l = await pb.collection("leads").getOne(leadId).catch(() => null);
+        nombreCliente = String(l?.nombre ?? "").trim();
+      }
       const saludo =
-        "¡Hola! Buen día 👋 Le saluda Créditos a tu medida. Con gusto le ayudo con su información de préstamo. ¿Me regala su nombre completo, por favor?";
+        esRecurrente && nombreCliente
+          ? `¡Hola de nuevo, ${nombreCliente}! 👋 Le saluda Créditos a tu medida. Qué gusto que se comunique otra vez. Ya tengo sus datos registrados, así que podemos ir directo. ¿En qué le puedo ayudar hoy?`
+          : "¡Hola! Buen día 👋 Le saluda Créditos a tu medida. Con gusto le ayudo con su información de préstamo. ¿Me regala su nombre completo, por favor?";
       await pb.collection("messages").create({
         conversation: conversationId,
         remitente: "bot",
@@ -526,12 +546,34 @@ export async function POST(req: NextRequest) {
 
   let leadId: string;
   let esLeadNuevo = false;
+  // Cliente recurrente: ya existía un lead con este número (mismo WhatsApp) y
+  // tiene nombre → el bot lo reconoce y lo saluda por su nombre.
+  let esRecurrente = false;
+  // Si el lead estaba archivado o cerrado y vuelve a escribir, reactivamos todo
+  // (lead al pipeline + bot encendido) para que reciba respuesta.
+  let reactivar = false;
   if (existingLead) {
     leadId = existingLead.id;
     // Si el lead existente no tiene nombre y ahora lo sabemos, lo rellenamos.
     const nombreExistente = existingLead.nombre;
     if ((!nombreExistente || !String(nombreExistente).trim()) && parsed.nombre) {
       await pb.collection("leads").update(leadId, { nombre: parsed.nombre });
+    }
+    // ¿Tenía nombre ya? → es un cliente conocido que vuelve a escribir.
+    esRecurrente = Boolean(String(nombreExistente ?? "").trim());
+    // Reactivar el lead: si estaba archivado o cerrado, vuelve al pipeline.
+    const statusActual = String(existingLead.status ?? "");
+    const estabaArchivado = Boolean(existingLead.archivado);
+    const estaCerrado = statusActual === "cerrado_ganado" || statusActual === "cerrado_perdido";
+    if (estabaArchivado || estaCerrado) {
+      reactivar = true;
+      await pb
+        .collection("leads")
+        .update(leadId, {
+          archivado: false,
+          ...(estaCerrado ? { status: "nuevo" } : {}),
+        })
+        .catch(() => {});
     }
   } else {
     const newLead = await pb.collection("leads").create({
@@ -555,11 +597,14 @@ export async function POST(req: NextRequest) {
   if (existingConversation) {
     conversationId = existingConversation.id;
     botActivo = existingConversation.bot_activo;
-    // Refrescar los ids de Zernio por si cambiaron
+    // Refrescar los ids de Zernio por si cambiaron. Si el lead se reactivó
+    // (venía archivado/cerrado), volvemos a encender el bot para responderle.
     await pb.collection("conversations").update(conversationId, {
       zernio_conversation_id: parsed.conversationId,
       zernio_account_id: parsed.accountId,
+      ...(reactivar ? { bot_activo: true, necesita_asesor: false } : {}),
     });
+    if (reactivar) botActivo = true;
   } else {
     const newConversation = await pb.collection("conversations").create({
       lead: leadId,
@@ -593,7 +638,7 @@ export async function POST(req: NextRequest) {
   // marcador de dedupe, así que el cliente se quedaba sin respuesta. Devolvemos
   // 200 ya y el turno del bot corre en segundo plano (after()).
   after(async () => {
-    await procesarTurnoBot({ pb, parsed, telefono, leadId, conversationId, esLeadNuevo });
+    await procesarTurnoBot({ pb, parsed, telefono, leadId, conversationId, esLeadNuevo, esRecurrente });
   });
 
   return NextResponse.json({ ok: true, accepted: true });

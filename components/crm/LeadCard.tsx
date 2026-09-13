@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition, useState } from "react";
-import { claimLead, deleteLead } from "@/app/crm/actions";
+import { claimLead, deleteLead, archivarLead } from "@/app/crm/actions";
 import { ReassignControl } from "./LeadDetailForms";
 import { calcularEdad } from "@/lib/edad";
 import type { PbLead } from "@/lib/types";
@@ -18,6 +18,7 @@ export function LeadCard({
   currentUserId,
   asignadoNombre,
   necesitaAsesor,
+  archivado,
 }: {
   lead: PbLead;
   onDragStart: (e: React.DragEvent) => void;
@@ -28,6 +29,7 @@ export function LeadCard({
   currentUserId?: string;
   asignadoNombre?: string | null;
   necesitaAsesor?: boolean;
+  archivado?: boolean;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -45,6 +47,13 @@ export function LeadCard({
       await claimLead(lead.id);
       setJustClaimed(true);
       setTimeout(() => setJustClaimed(false), 2000);
+    });
+  }
+
+  function handleArchive() {
+    startTransition(async () => {
+      await archivarLead(lead.id, !archivado);
+      router.refresh();
     });
   }
 
@@ -176,6 +185,18 @@ export function LeadCard({
               Tomar
             </button>
           )}
+          <button
+            disabled={isPending}
+            onClick={handleArchive}
+            className={`rounded-md px-2 py-0.5 text-[10px] font-semibold disabled:opacity-50 ${
+              archivado
+                ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+            title={archivado ? "Devolver al pipeline" : "Archivar (conserva los datos)"}
+          >
+            {archivado ? "Desarchivar" : "📦 Archivar"}
+          </button>
           {isAdmin && !confirmingDelete && (
             <button
               disabled={isPending}

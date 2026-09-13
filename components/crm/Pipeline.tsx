@@ -12,10 +12,12 @@ export function Pipeline({ leads, vendedores, isAdmin, currentUserId, leadsNeces
   const [overStage, setOverStage] = useState<LeadStatus | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [busqueda, setBusqueda] = useState("");
+  const [verArchivados, setVerArchivados] = useState(false);
 
   const byStatus = useCallback(
     (status: LeadStatus) =>
       leads
+        .filter((l) => (verArchivados ? l.archivado === true : !l.archivado))
         .filter((l) => l.status === status)
         .filter((l) => {
           if (!busqueda.trim()) return true;
@@ -24,8 +26,10 @@ export function Pipeline({ leads, vendedores, isAdmin, currentUserId, leadsNeces
           const tel = (l.telefono ?? "").toLowerCase();
           return nombre.includes(q) || tel.includes(q);
         }),
-    [leads, busqueda]
+    [leads, busqueda, verArchivados]
   );
+
+  const totalArchivados = leads.filter((l) => l.archivado === true).length;
 
   const asignadoNombre = useCallback(
     (id: string | null) => {
@@ -36,7 +40,7 @@ export function Pipeline({ leads, vendedores, isAdmin, currentUserId, leadsNeces
     [vendedores]
   );
 
-  const total = leads.length;
+  const total = leads.filter((l) => (verArchivados ? l.archivado === true : !l.archivado)).length;
 
   function handleDrop(e: React.DragEvent, targetStatus: LeadStatus) {
     e.preventDefault();
@@ -68,6 +72,17 @@ export function Pipeline({ leads, vendedores, isAdmin, currentUserId, leadsNeces
             className="shrink-0 rounded-full bg-blue-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-blue-500"
           >
             + Nuevo lead
+          </button>
+          <button
+            onClick={() => setVerArchivados((v) => !v)}
+            className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold ${
+              verArchivados
+                ? "border-amber-400 bg-amber-500 text-white hover:bg-amber-600"
+                : "border-slate-600 text-slate-200 hover:bg-slate-700"
+            }`}
+            title="Ver leads archivados (datos conservados)"
+          >
+            {verArchivados ? "← Volver a activos" : `📦 Archivados (${totalArchivados})`}
           </button>
           <button
             onClick={() => {
@@ -167,6 +182,7 @@ export function Pipeline({ leads, vendedores, isAdmin, currentUserId, leadsNeces
                                       currentUserId={currentUserId}
                                       asignadoNombre={asignadoNombre(lead.asignado_a)}
                                       necesitaAsesor={leadsNecesitanAsesor?.includes(lead.id)}
+                                      archivado={lead.archivado === true}
                     isDragging={draggingId === lead.id}
                     onDragStart={(e) => {
                       e.dataTransfer.setData("text/lead-id", lead.id);
