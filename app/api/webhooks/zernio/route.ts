@@ -19,6 +19,7 @@ import {
   extraerHora,
   pideAgendar,
   pideReagendar,
+  pareceHoraODia,
   detectarDia,
   horariosLibres,
   recortarHorasPasadas,
@@ -293,9 +294,9 @@ async function procesarTurnoBot(args: {
       return "número de seguro social (NSS)";
     };
 
-    const intentarAgendarDeterminista = async (): Promise<string | null> => {
+    const intentarAgendarDeterminista = async (forzar = false): Promise<string | null> => {
       if (!nombreLead) return null;
-      if (!pideAgendar(textoCliente)) return null;
+      if (!forzar && !pideAgendar(textoCliente)) return null;
 
       // El identificador se pide ANTES de agendar. Si el lead aún no lo tiene,
       // pregunta según la dependencia (no NSS para todos).
@@ -400,11 +401,21 @@ async function procesarTurnoBot(args: {
       } else {
         // Turno normal con respuesta del LLM. Pero cuando el cliente pide
         // agendar (hora o día), SIEMPRE forzamos el flujo determinista por
-        // código: así se pide el NSS, se crea/actualiza la cita en el
+        // código: así se pide el identificador, se crea/actualiza la cita en el
         // calendario y se entrega la dirección limpia. Gemini en este turno
         // se saltaba el NSS e inventaba requisitos/documentos extra.
-        if (pideAgendar(textoCliente) || pideReagendar(textoCliente)) {
-          const respAgenda = await intentarAgendarDeterminista();
+        // También se fuerza si el lead ya está listo (tiene dependencia +
+        // identificador) y el cliente contesta algo que parece hora o día —
+        // aunque sea una respuesta corta como "10".
+        const leadListo =
+          String(leadActual?.institucion ?? "").trim() !== "" &&
+          String(leadActual?.nss ?? "").trim() !== "";
+        const forzarAgenda =
+          pideAgendar(textoCliente) ||
+          pideReagendar(textoCliente) ||
+          (leadListo && pareceHoraODia(textoCliente));
+        if (forzarAgenda) {
+          const respAgenda = await intentarAgendarDeterminista(true);
           if (respAgenda) {
             await enviarMensajeBot(respAgenda);
             return;

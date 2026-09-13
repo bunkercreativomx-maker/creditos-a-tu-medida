@@ -186,6 +186,23 @@ export function pideReagendar(texto: string): boolean {
   return /(reagendar|re-agendar|reagenda|cambiar (mi )?cita|cambiar (mi )?hora|mover (la )?cita|otra hora|otro d[ií]a|m[aá]s tarde|adelantar|atrasar|no puedo|me queda mal|cancelar)/.test(t);
 }
 
+/**
+ * ¿El texto parece una hora o un día (aunque sea una respuesta corta como
+ * "10", "10am", "mañana", "el lunes")? Sirve para agendar cuando el bot ya
+ * preguntó la hora y el cliente contesta con un número suelto.
+ */
+export function pareceHoraODia(texto: string): boolean {
+  const t = (texto || "").trim().toLowerCase();
+  if (!t) return false;
+  // Número suelto (1-2 dígitos) o con am/pm, ej. "10", "10 am", "4pm", "11:30".
+  if (/^\d{1,2}(\s*(:\d{2})?)\s*(a\.?\s*m\.?|p\.?\s*m\.?)?$/.test(t)) return true;
+  // Hora en cualquier parte.
+  if (/\b\d{1,2}(:\d{2})?\s*(a\.?\s*m\.?|p\.?\s*m\.?)\b/.test(t)) return true;
+  if (/\b\d{1,2}:\d{2}\b/.test(t)) return true;
+  // Día.
+  return /(hoy|mañana|pasado mañana|lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo)/.test(t);
+}
+
 /** ¿El texto pide agendar / menciona un día u hora? */
 export function pideAgendar(texto: string): boolean {
   const t = (texto || "").toLowerCase();
