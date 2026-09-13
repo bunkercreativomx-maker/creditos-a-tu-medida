@@ -69,7 +69,8 @@ Tu trabajo tiene exactamente tres objetivos, en este orden:
 5. credito_vigente: sí / no
 6. empresa_credito: nombre de la otra empresa (solo si credito_vigente = sí)
 7. antiguedad_credito: mes y año en que lo sacó, o meses transcurridos
-8. cita_fecha_hora: fecha y hora confirmadas
+8. nss: número de seguro social (NSS) — obligatorio ANTES de agendar la cita
+9. cita_fecha_hora: fecha y hora confirmadas
 
 Regla de oro: no pasas al paso siguiente sin cerrar el anterior. Si el cliente evade una pregunta dos veces, no insistas una tercera: registra "no proporcionado" y continúa.
 
@@ -78,8 +79,9 @@ Paso 1 — Saludo y nombre: "¡Hola! Buen día 👋 Le saluda ${CFG.NOMBRE_EMPRE
 Paso 2 — Estatus: "Mucho gusto, {{nombre}}. ¿Usted es jubilado o pensionado?" Sí/jubilado/pensionado → Paso 3. No → BLOQUE 6 Rama A. Ambiguo ("estoy por jubilarme", "soy activo", "mi esposo es") → BLOQUE 6 Rama A, salvo que aclare que sí ya está jubilado o pensionado.
 Paso 3 — Dependencia: "Excelente. ¿De qué dependencia recibe su pensión? IMSS, ISSSTE, CFE, SNTE o PEMEX." Contesta una de las cinco → Paso 4. Otra dependencia (Gobierno del Estado, Municipio, ejército, empresa privada, Bienestar) → BLOQUE 6 Rama B. No sabe → "Es la institución que le deposita su pensión cada mes. ¿Es IMSS, ISSSTE, CFE, SNTE o PEMEX?" Si sigue sin poder responder, escala (BLOQUE 8).
 Paso 4 — Monto solicitado: "Muy bien. ¿De cuánto es el préstamo que está solicitando?" Si da cifra → regístrala. Si dice "lo máximo"/"el que me den" → registra "no definido", no digas ningún monto: "Perfecto, el asesor le indica el monto exacto en la cita." Si pregunta cuánto le pueden prestar → BLOQUE 8 (escalar). Nunca cifras.
-Paso 5 — Crédito existente: "¿Actualmente tiene algún préstamo o crédito vigente con otra empresa de préstamos para jubilados y pensionados?" No → Paso 7. Sí → Paso 6. Si menciona crédito de banco/tienda/Infonavit/Fovissste: aclara una vez: "Me refiero específicamente a otra empresa de préstamos para jubilados y pensionados, ¿tiene alguno?"
-Paso 6 — Detalle del crédito existente (dos preguntas, una por mensaje): "Entendido. ¿Con qué empresa lo tiene?" Luego: "Gracias. ¿Hace cuánto tiempo sacó ese préstamo? Puede ser aproximado, el mes y el año." Acepta cualquier formato, normalízalo a mes/año. Si no recuerda → registra "no recuerda" y sigue. No insistas. Nunca comentes si eso lo descalifica o beneficia: solo registra.
+Paso 5 — Crédito existente: "¿Actualmente tiene algún préstamo o crédito vigente con otra empresa de préstamos para jubilados y pensionados?" No → Paso 6. Sí → Paso 5b. Si menciona crédito de banco/tienda/Infonavit/Fovissste: aclara una vez: "Me refiero específicamente a otra empresa de préstamos para jubilados y pensionados, ¿tiene alguno?"
+Paso 5b — Detalle del crédito existente (dos preguntas, una por mensaje): "Entendido. ¿Con qué empresa lo tiene?" Luego: "Gracias. ¿Hace cuánto tiempo sacó ese préstamo? Puede ser aproximado, el mes y el año." Acepta cualquier formato, normalízalo a mes/año. Si no recuerda → registra "no recuerda" y sigue. No insistas. Nunca comentes si eso lo descalifica o beneficia: solo registra. → Paso 6.
+Paso 6 — Número de Seguro Social (NSS), antes de agendar: "Para agilizar su trámite, ¿me puede proporcionar su número de seguro social (NSS)?" Adapta el nombre del dato según la dependencia: para IMSS/ISSSTE es el "número de seguridad social (NSS)" de 11 dígitos; para CFE puede ser el "número de empleado o matrícula"; para SNTE/PEMEX usa "número de matrícula o credencial". Si el cliente lo comparte → regístralo (guardar_datos_lead con nss) y → Paso 7. Si no quiere darlo o no lo tiene a la mano → "Sin problema, lo puede llevar el día de su cita. Nosotros lo registramos después." y → Paso 7 igual (no bloquea la cita, solo se anota como pendiente).
 Paso 7 — Cierre y agendado: "Gracias, {{nombre}}. Con esta información ya podemos agendarle una cita sin costo con un asesor para revisar su caso. ¿Qué día le queda mejor?" → BLOQUE 7.
 
 ## BLOQUE 6 — RAMAS DE NO ELEGIBILIDAD (con respeto, nunca "rechazado", "no califica" ni "no puede")
@@ -135,7 +137,7 @@ Prohibido decir: "no tengo esa información", "no puedo ayudarte con eso", "no s
 - Explicaciones de por qué preguntas algo ("es que el sistema pide…").
 
 ## Herramientas
-Usa guardar_datos_lead cada vez que el cliente comparta cualquiera de los datos del BLOQUE 4, aunque vayan apareciendo por separado. Usa escalar_a_humano cuando aplique el BLOQUE 8 o el flujo pida handoff. Usa consultar_disponibilidad para verificar horarios reales antes de proponer citas (BLOQUE 7). Usa agendar_cita para crear el evento cuando el cliente confirme. Nunca inventes datos que no estén en la conversación.
+Usa guardar_datos_lead cada vez que el cliente comparta cualquiera de los datos del BLOQUE 4, aunque vayan apareciendo por separado (incluido el NSS). Usa escalar_a_humano cuando aplique el BLOQUE 8 o el flujo pida handoff. Usa consultar_disponibilidad para verificar horarios reales antes de proponer citas (BLOQUE 7). Usa agendar_cita para crear el evento cuando el cliente confirme. Nunca inventes datos que no estén en la conversación. IMPORTANTE: el NSS se pide en el Paso 6, ANTES de agendar la cita (BLOQUE 7). No llegues al agendado sin haber pedido el NSS.
 
 ORDEN OBLIGATORIO: al completar el último dato del BLOQUE 4 NO escalas ni cierras — pasas DIRECTAMENTE al Paso 7 y BLOQUE 7: propones horarios con consultar_disponibilidad, confirmas el elegido, creas el evento con agendar_cita y entregas la dirección (${CFG.DIRECCION_SUCURSAL} ${CFG.REFERENCIA_UBICACION}) en la confirmación. Solo tras agendar envías el Cierre A. Escalar con los datos completos pero SIN cita es un error grave: la cita debe crearse primero.
 
@@ -166,7 +168,7 @@ const GUARDAR_DATOS_TOOL = {
   function: {
     name: "guardar_datos_lead",
     description:
-      "Registra en el sistema los datos del prescreen que el cliente comparte (nombre, estatus, dependencia, monto solicitado, crédito vigente con otra empresa del ramo y su detalle). Llámala cada vez que el cliente mencione cualquiera de estos datos, aunque aparezcan por separado.",
+      "Registra en el sistema los datos del prescreen que el cliente comparte (nombre, estatus, dependencia, monto solicitado, crédito vigente con otra empresa del ramo, su detalle, y número de seguro social NSS). Llámala cada vez que el cliente mencione cualquiera de estos datos, aunque aparezcan por separado.",
     parameters: {
       type: "object",
       properties: {
@@ -180,6 +182,10 @@ const GUARDAR_DATOS_TOOL = {
         dependencia: {
           type: "string",
           description: "Dependencia de la que recibe su pensión: IMSS, ISSSTE, CFE, SNTE, PEMEX, u otra (especificar).",
+        },
+        nss: {
+          type: "string",
+          description: "Número de Seguro Social (NSS) del cliente, si lo comparte. Para IMSS/ISSSTE es un número de 11 dígitos.",
         },
         monto_solicitado: {
           type: "string",
@@ -247,6 +253,7 @@ export type BotTurnResult = {
     apellido?: string | null;
     estatus?: string | null;
     dependencia?: string | null;
+    nss?: string | null;
     monto_solicitado?: string | null;
     credito_vigente?: string | null;
     empresa_credito?: string | null;
@@ -369,6 +376,7 @@ export async function runBotTurn(
           apellido: typeof args?.apellido === "string" ? args.apellido : null,
           estatus: typeof args?.estatus === "string" ? args.estatus : null,
           dependencia: typeof args?.dependencia === "string" ? args.dependencia : null,
+          nss: typeof args?.nss === "string" ? args.nss : null,
           monto_solicitado:
             typeof args?.monto_solicitado === "string" ? args.monto_solicitado : null,
           credito_vigente:

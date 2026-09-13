@@ -184,6 +184,7 @@ async function procesarTurnoBot(args: {
       if (botResult.leadData.apellido) updates.apellido = botResult.leadData.apellido;
       if (botResult.leadData.estatus) updates.sector = botResult.leadData.estatus;
       if (botResult.leadData.dependencia) updates.institucion = botResult.leadData.dependencia;
+      if (botResult.leadData.nss) updates.nss = botResult.leadData.nss;
       if (botResult.leadData.monto_solicitado)
         updates.monto_aproximado = botResult.leadData.monto_solicitado;
       if (botResult.leadData.credito_vigente)
@@ -280,6 +281,13 @@ async function procesarTurnoBot(args: {
       const nombreLead = String(lead?.nombre ?? "").trim();
       if (!nombreLead) return null;
       if (!pideAgendar(textoCliente)) return null;
+
+      // El NSS se pide ANTES de agendar. Si el lead aún no lo tiene, pregunta
+      // en lugar de agendar (así el dato no se salta).
+      const nssLead = String(lead?.nss ?? "").trim();
+      if (!nssLead) {
+        return `Para agilizar su trámite, ${nombreLead}, ¿me puede proporcionar su número de seguro social (NSS)? Con eso agendo su cita. Si no lo tiene a la mano, sin problema, lo puede llevar el día de su cita.`;
+      }
 
       const horaPedida = extraerHora(textoCliente);
       const fechaPedida = detectarDia(textoCliente);
