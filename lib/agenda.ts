@@ -67,18 +67,48 @@ export function fechaEsp(fechaIso: string): string {
   }).format(d);
 }
 
-/** Horarios hábiles propuestos (9-18 h, sin domingo). */
+/** Horarios hábiles entre semana (lun-vie), hasta las 17:00. */
 export function HORARIOS_BASE(): string[] {
   return ["09:00", "10:00", "11:00", "12:00", "13:00", "15:00", "16:00", "17:00"];
 }
 
+/** Horarios de sábado (hasta las 14:00). */
+export function HORARIOS_SABADO(): string[] {
+  return ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00"];
+}
+
+/** Horarios de domingo (solo con cita; horario reducido 10:00–14:00). */
+export function HORARIOS_DOMINGO(): string[] {
+  return ["10:00", "11:00", "12:00", "13:00", "14:00"];
+}
+
+/**
+ * Horarios base según el día de la semana (fecha YYYY-MM-DD).
+ * Lunes-Viernes 9-17h; sábado 9-14h; domingo 10-14h (solo cita).
+ */
+export function horariosParaDia(fechaIso: string): string[] {
+  const wd = new Date(`${fechaIso}T12:00:00Z`).getUTCDay();
+  if (wd === 6) return HORARIOS_SABADO();
+  if (wd === 0) return HORARIOS_DOMINGO();
+  return HORARIOS_BASE();
+}
+
 /**
  * Horarios libres de una fecha, consultando las citas existentes en PocketBase.
- * `pb` es el cliente admin; `ocupadas` ya extraído (horas HH:MM ocupadas).
+ * `ocupadas` ya extraído (horas HH:MM ocupadas).
  */
-export function horariosLibres(ocupadas: string[]): string[] {
+export function horariosLibres(ocupadas: string[], fechaIso?: string): string[] {
   const ocup = new Set(ocupadas);
-  return HORARIOS_BASE().filter((h) => !ocup.has(h));
+  const base = fechaIso ? horariosParaDia(fechaIso) : HORARIOS_BASE();
+  return base.filter((h) => !ocup.has(h));
+}
+
+/**
+ * Recorta los horarios libres que ya pasaron, para permitir agendar HOY mismo
+ * hasta las 17:00. `horaActualHHMM` en hora local (ej. "14:30").
+ */
+export function recortarHorasPasadas(libres: string[], horaActualHHMM: string): string[] {
+  return libres.filter((h) => h > horaActualHHMM);
 }
 
 /** Extrae una hora HH:MM mencionada en un texto ("a las 10", "10:00", "las 11"). */
@@ -162,13 +192,21 @@ export function pideAgendar(texto: string): boolean {
   return /(agendar|agenda|agendarme|cita|horario|qué día|que día|mañana|pasado mañana|lo antes posible|lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|a las \d|:\d\d)/.test(t);
 }
 
-/** Detecta el día pedido en el texto → fecha YYYY-MM-DD (próximo día hábil). */
+/** Suma n días de calendario a partir de hoy (sin saltar domingos). */
+export function sumarDiasCalendario(dias: number): string {
+  const { iso } = hoyJuarez();
+  const d = new Date(`${iso}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + dias);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Detecta el día pedido en el texto → fecha YYYY-MM-DD (día de calendario). */
 export function detectarDia(texto: string): string | null {
   const t = (texto || "").toLowerCase();
   const hoy = hoyJuarez();
   if (/hoy/.test(t)) return hoy.iso;
-  if (/pasado mañana/.test(t)) return sumarDiasHabiles(2);
-  if (/mañana/.test(t)) return sumarDiasHabiles(1);
+  if (/pasado mañana/.test(t)) return sumarDiasCalendario(2);
+  if (/mañana/.test(t)) return sumarDiasCalendario(1);
   const dias = [
     ["lunes", 1],
     ["martes", 2],
@@ -176,17 +214,15 @@ export function detectarDia(texto: string): string | null {
     ["jueves", 4],
     ["viernes", 5],
     ["s[aá]bado", 6],
+    ["domingo", 0],
   ] as const;
+  const hoyWD = new Date(`${hoy.iso}T12:00:00Z`).getUTCDay();
   for (const [pat, objetivo] of dias) {
     if (new RegExp(pat).test(t)) {
-      // Cuenta días hábiles hasta alcanzar ese weekday objetivo.
-      let i = 0;
-      for (;;) {
-        const f = sumarDiasHabiles(i + 1);
-        const wd = new Date(`${f}T12:00:00Z`).getUTCDay();
-        if (wd === objetivo) return f;
-        i++;
-      }
+      // Próximo día de calendario con ese weekday (hoy cuenta si ya es ese día).
+      let diff = (objetivo - hoyWD + 7) % 7;
+      if (diff === 0) diff = 7; // si ya es ese día, el siguiente igual
+      return sumarDiasCalendario(diff);
     }
   }
   return null;

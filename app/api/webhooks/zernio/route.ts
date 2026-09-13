@@ -14,6 +14,7 @@ import { notifyNewLeadToSlack } from "@/lib/slack-notify";
 import { notifyNewLead, notifyNeedsAdvisor } from "@/lib/push";
 import {
   sumarDiasHabiles,
+  sumarDiasCalendario,
   diaSemanaEsp,
   fechaEsp,
   extraerHora,
@@ -21,6 +22,8 @@ import {
   pideReagendar,
   detectarDia,
   horariosLibres,
+  recortarHorasPasadas,
+  hoyJuarez,
   horaLocalAUtc,
 } from "@/lib/agenda";
 import { sanearDireccion } from "@/lib/direccion";
@@ -280,17 +283,29 @@ async function procesarTurnoBot(args: {
     // la cita si dio la hora, y se entrega la dirección. Devuelve el texto a
     // enviar, o null si no aplica (hay que escalar).
     const textoCliente = String(parsed.text ?? "").trim();
+    // Etiqueta del identificador según la dependencia (Paso 6 del prompt).
+    const etiquetaIdentificador = (): string => {
+      const dep = String(leadActual?.institucion ?? "").toUpperCase();
+      if (dep.includes("IMSS")) return "número de seguro social (NSS)";
+      if (dep.includes("ISSSTE")) return "número de seguridad social del ISSSTE o su número de expediente";
+      if (dep.includes("CFE")) return "número de ficha, registro de trabajador o número de empleado de CFE";
+      if (dep.includes("PEMEX")) return "número de ficha, registro de trabajador o número de empleado de PEMEX";
+      if (dep.includes("SNTE")) return "RFC con homoclave o su CURP";
+      return "número de seguro social (NSS)";
+    };
+
     const intentarAgendarDeterminista = async (): Promise<string | null> => {
       if (!nombreLead) return null;
       if (!pideAgendar(textoCliente)) return null;
 
-      // El NSS se pide ANTES de agendar. Si el lead aún no lo tiene, pregunta
-      // en lugar de agendar (así el dato no se salta).
+      // El identificador se pide ANTES de agendar. Si el lead aún no lo tiene,
+      // pregunta según la dependencia (no NSS para todos).
       const nssLead = String(leadActual?.nss ?? "").trim();
       if (!nssLead) {
-        return `Para agilizar su trámite, ${nombreLead}, ¿me puede proporcionar su número de seguro social (NSS)? Con eso agendo su cita. Si no lo tiene a la mano, sin problema, lo puede llevar el día de su cita.`;
+        return `Para agilizar su trámite, ${nombreLead}, ¿me puede proporcionar su ${etiquetaIdentificador()}? Con eso agendo su cita. Si no lo tiene a la mano, sin problema, lo puede llevar el día de su cita.`;
       }
 
+      const hoy = hoyJuarez();
       const horaPedida = extraerHora(textoCliente);
       const fechaPedida = detectarDia(textoCliente);
       const DIR = "Benjamín Franklin 3220, Local 22D, Plaza de las Américas, Zona Pronaf, C.P. 32315, Cd. Juárez, Chihuahua";
@@ -305,10 +320,24 @@ async function procesarTurnoBot(args: {
           .filter(Boolean) as string[];
       };
 
+      // Si el día pedido es HOY, recorta las horas que ya pasaron (permite
+      // agendar el mismo día hasta las 17:00).
+      const filtrarLibres = (libres: string[], fecha: string): string[] => {
+        let out = libres;
+        if (fecha === hoy.iso) out = recortarHorasPasadas(out, hoy.hora);
+        return out.slice(0, 2);
+      };
+
       // Caso 1: el cliente dio una hora concreta (con o sin día).
       if (horaPedida) {
-        // Si no especificó día, usa el que pidió antes o el próximo día hábil.
-        const fecha = fechaPedida ?? sumarDiasHabiles(1);
+        const fecha = fechaPedida ?? (horaPedida > hoy.hora && hoy.iso ? hoy.iso : sumarDiasHabiles(1));
+        // Si el día es hoy, no aceptar una hora ya pasada.
+        if (fecha === hoy.iso && horaPedida <= hoy.hora) {
+          const ocupadas = await leerOcupadas(fecha);
+          const libres = filtrarLibres(horariosLibres(ocupadas, fecha), fecha);
+          if (libres.length === 0) return null;
+          return `Esa hora ya pasó hoy. Le puedo ofrecer las ${libres[0]} o las ${libres[1]} de hoy. 📍 ${DIR}.`;
+        }
         const ocupadas = await leerOcupadas(fecha);
         if (!ocupadas.includes(horaPedida)) {
           // Hora local → UTC (evita que una cita de las 10:00 salga a las 4:00am).
@@ -343,7 +372,7 @@ async function procesarTurnoBot(args: {
           return `¡Listo, ${nombreLead}! Su cita queda confirmada: 📅 ${fechaEsp(fecha)} a las ${horaPedida} 📍 ${DIR}. Un asesor lo estará esperando. Si necesita cambiar la cita, solo escríbame por aquí.`;
         }
         // La hora pedida está ocupada → proponer alternativas.
-        const libres = horariosLibres(ocupadas).slice(0, 2);
+        const libres = filtrarLibres(horariosLibres(ocupadas, fecha), fecha);
         if (libres.length === 0) return null;
         return `A esa hora ya está apartado. Le puedo ofrecer las ${libres[0]} o las ${libres[1]} el ${diaSemanaEsp(fecha)} ${fecha.slice(8, 10)}. 📍 ${DIR}.`;
       }
@@ -351,9 +380,11 @@ async function procesarTurnoBot(args: {
       // Caso 2: pidió agendar sin hora concreta (o día relativo).
       const fecha = fechaPedida ?? sumarDiasHabiles(1);
       const ocupadas = await leerOcupadas(fecha);
-      const libres = horariosLibres(ocupadas).slice(0, 2);
+      const libres = filtrarLibres(horariosLibres(ocupadas, fecha), fecha);
       if (libres.length === 0) return null;
-      return `Claro, ${nombreLead}. Para su cita del ${fechaEsp(fecha)} tengo disponible a las ${libres[0]} o a las ${libres[1]}. ¿Cuál le acomoda? 📍 Estamos en ${DIR}.`;
+      const finSemana =
+        fecha === hoy.iso ? " hoy" : ` el ${fechaEsp(fecha)}`;
+      return `Claro, ${nombreLead}. Para su cita${finSemana} tengo disponible a las ${libres[0]} o a las ${libres[1]}. ¿Cuál le acomoda? 📍 Estamos en ${DIR}.`;
     };
 
     try {
