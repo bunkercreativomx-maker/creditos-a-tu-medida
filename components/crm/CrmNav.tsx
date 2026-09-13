@@ -134,10 +134,10 @@ export function CrmNav({ fullName, role, leadsNuevosHoy, conversacionesParaAseso
           </nav>
         )}
 
-        {/* Aviso de conversaciones que necesitan asesor */}
+        {/* Aviso de conversaciones y leads web que necesitan asesor */}
         {typeof conversacionesParaAsesor === "number" && conversacionesParaAsesor > 0 && (
           <Link
-            href="/crm/conversaciones"
+            href="/crm/pipeline"
             onClick={() => setMenuOpen(false)}
             className="mb-2 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 transition-colors hover:bg-amber-100"
           >
@@ -150,8 +150,8 @@ export function CrmNav({ fullName, role, leadsNuevosHoy, conversacionesParaAseso
                 {conversacionesParaAsesor}
               </span>{" "}
               {conversacionesParaAsesor === 1
-                ? "conversación lista y espera a un asesor"
-                : "conversaciones listas y esperan a un asesor"}
+                ? "solicitud lista y espera a un asesor"
+                : "solicitudes listas y esperan a un asesor"}
             </span>
             <span className="ml-auto text-xs text-amber-600">Atender →</span>
           </Link>
