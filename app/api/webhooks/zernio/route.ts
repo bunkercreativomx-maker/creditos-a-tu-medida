@@ -242,10 +242,13 @@ async function procesarTurnoBot(args: {
     const resultWithError = botResult as BotTurnResultWithError;
     const botFallo = resultWithError.botError || !botResult.reply || !botResult.reply.trim();
 
+    // Marca la conversación como "necesita asesor" (aviso ámbar + notificación)
+    // PERO deja el bot activo: el cliente sigue recibiendo respuestas hasta que
+    // un asesor tome la conversación (claimLead) o conteste (sendAdvisorMessage).
     const marcarParaAsesor = async () => {
       await pb
         .collection("conversations")
-        .update(conversationId, { bot_activo: false, necesita_asesor: true })
+        .update(conversationId, { necesita_asesor: true })
         .catch(() => {});
       await pb.collection("leads").update(leadId, { status: "en_seguimiento" }).catch(() => {});
     };

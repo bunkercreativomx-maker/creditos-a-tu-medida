@@ -17,6 +17,7 @@ export function LeadCard({
   vendedores,
   currentUserId,
   asignadoNombre,
+  necesitaAsesor,
 }: {
   lead: PbLead;
   onDragStart: (e: React.DragEvent) => void;
@@ -26,6 +27,7 @@ export function LeadCard({
   vendedores?: { id: string; name: string }[];
   currentUserId?: string;
   asignadoNombre?: string | null;
+  necesitaAsesor?: boolean;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -91,8 +93,9 @@ export function LeadCard({
           {lead.telefono}
         </div>
 
-        {/* Aviso parpadeante: lead del formulario web sin atender → necesita asesor */}
-        {lead.origen === "web_form" && lead.status === "nuevo" && (
+        {/* Aviso parpadeante: formulario web sin atender, o conversación de
+            WhatsApp que necesita un asesor. */}
+        {((lead.origen === "web_form" && lead.status === "nuevo") || necesitaAsesor) && (
           <div className="mt-2">
             <span className="inline-flex animate-pulse items-center gap-1 rounded-full bg-amber-500 px-2.5 py-1 text-[10px] font-bold text-white shadow-sm">
               ⚠️ Necesita asesor
