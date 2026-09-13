@@ -180,6 +180,25 @@ export function horaLocalAUtc(fechaIso: string, horaHHMM: string): string {
   return new Date(utcMs).toISOString();
 }
 
+/**
+ * ¿El texto parece un número de identificación (NSS, número de empleado, RFC)?
+ * Acepta 6+ dígitos seguidos, o cadenas alfanuméricas de 10+ (RFC/CURP).
+ */
+export function pareceIdentificador(texto: string): boolean {
+  const t = (texto || "").trim();
+  if (/^\d{6,}$/.test(t)) return true; // NSS / ficha / número de empleado
+  if (/^[A-Za-z0-9]{10,18}$/.test(t) && /\d/.test(t) && /[A-Za-z]/.test(t)) return true; // RFC/CURP
+  return false;
+}
+
+/**
+ * ¿El texto pregunta por la ubicación o la dirección?
+ */
+export function pideUbicacion(texto: string): boolean {
+  const t = (texto || "").toLowerCase();
+  return /(ubicad|direcci[oó]n|d[oó]nde est|donde est|localiza|sucursal|c[oó]mo llego|como llego|domicilio)/.test(t);
+}
+
 /** ¿El texto pide reagendar/cambiar una cita existente? */
 export function pideReagendar(texto: string): boolean {
   const t = (texto || "").toLowerCase();

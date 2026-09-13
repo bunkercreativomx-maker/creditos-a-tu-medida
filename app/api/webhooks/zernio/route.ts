@@ -20,6 +20,8 @@ import {
   pideAgendar,
   pideReagendar,
   pareceHoraODia,
+  pareceIdentificador,
+  pideUbicacion,
   detectarDia,
   horariosLibres,
   recortarHorasPasadas,
@@ -89,6 +91,72 @@ async function procesarTurnoBot(args: {
           ? `[El cliente envió una ${m.media_type === "image" ? "foto" : "imagen"}${m.contenido ? ` con el mensaje: ${m.contenido}` : ""}]`
           : m.contenido,
       }));
+
+    // Datos actuales del lead + textos que usan los manejadores deterministas.
+    const lead0 = await pb.collection("leads").getOne(leadId).catch(() => null);
+    const nombre0 = String(lead0?.nombre ?? parsed.nombre ?? "").trim();
+    const textoHoy = String(parsed.text ?? "").trim();
+    const DIR_OFICIAL =
+      "Benjamín Franklin 3220, Local 22D, Plaza de las Américas, Zona Pronaf, C.P. 32315, Cd. Juárez, Chihuahua";
+
+    // MANEJADOR: el cliente pregunta por la ubicación/dirección → responde directo
+    // con la dirección oficial (Gemini la alucinaba o repetía el cierre).
+    if (pideUbicacion(textoHoy) && nombre0) {
+      const msg = `Claro, ${nombre0}. Estamos en ${DIR_OFICIAL}. Le esperamos. ¿Le ayudo a agendar su cita?`;
+      await pb.collection("messages").create({
+        conversation: conversationId,
+        remitente: "bot",
+        contenido: msg,
+        created: new Date().toISOString(),
+      });
+      if (pbConversationId && pbAccountId) {
+        await sendWhatsAppMessage(pbConversationId, pbAccountId, msg).catch(() => {});
+      }
+      return;
+    }
+
+    // MANEJADOR: el cliente manda el identificador (NSS/número) y el lead ya
+    // tiene dependencia pero aún no el identificador → guardarlo y ofrecer la
+    // cita. Gemini fallaba al guardar+agendar y mandaba el cierre sin agendar.
+    const dep0 = String(lead0?.institucion ?? "").trim();
+    const nss0 = String(lead0?.nss ?? "").trim();
+    // Solo si el último mensaje del bot pidió el identificador (para no
+    // confundir con el monto u otro número).
+    const ultimoBot = [...(recentMessages.items ?? [])]
+      .reverse()
+      .find((m) => (m as { remitente?: string }).remitente === "bot") as
+      | { contenido?: string }
+      | undefined;
+    const pidioIdentificador = /(seguro social|n[uú]mero de seguro|n[uú]mero de expediente|n[uú]mero de ficha|n[uú]mero de empleado|matr[ií]cula|RFC|CURP|n[uú]mero del? ISSSTE)/i.test(
+      String(ultimoBot?.contenido ?? "")
+    );
+    if (dep0 && !nss0 && pidioIdentificador && pareceIdentificador(textoHoy) && nombre0) {
+      await pb.collection("leads").update(leadId, { nss: textoHoy }).catch(() => {});
+      // Ofrecer cita (menú de horarios) por código, para el próximo lunes.
+      const fechaMenu = proximoLunes();
+      const occMenu = (
+        await pb
+          .collection("citas")
+          .getFullList({ filter: `fecha ~ "${fechaMenu}"` })
+          .catch(() => [])
+      ) as unknown as { fecha?: string }[];
+      const ocupadasMenu = occMenu.map((c) => c.fecha?.slice(11, 16)).filter(Boolean) as string[];
+      const libresMenu = horariosLibres(ocupadasMenu, fechaMenu).slice(0, 2);
+      const msgCita = libresMenu.length
+        ? `Para su cita el ${fechaEsp(fechaMenu)} tengo disponible a las ${libresMenu[0]} o a las ${libresMenu[1]}. ¿Cuál le acomoda?`
+        : `¿Qué día y hora le quedan mejor para su cita?`;
+      const msg = `Perfecto, ${nombre0}. Ya registré su número. Ahora agendemos su cita: ${msgCita} 📍 Estamos en ${DIR_OFICIAL}.`;
+      await pb.collection("messages").create({
+        conversation: conversationId,
+        remitente: "bot",
+        contenido: msg,
+        created: new Date().toISOString(),
+      });
+      if (pbConversationId && pbAccountId) {
+        await sendWhatsAppMessage(pbConversationId, pbAccountId, msg).catch(() => {});
+      }
+      return;
+    }
 
     // SALUDO FIJO en el primer turno: el LLM alucina el nombre comercial
     // (CrediFiel, Financiera Más, Préstamos Ciudad Juárez, etc.), así que el
