@@ -12,12 +12,18 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
       - run: npm ci
+      # Los tipos globales de typed-routes (LayoutProps<"/">, etc.) viven en
+      # .next/types/, que NO existe en un checkout limpio. `next typegen` los
+      # genera sin un build completo, para que `tsc --noEmit` no falle con
+      # "Cannot find name 'LayoutProps'".
+      - name: Generate route types (typed-routes)
+        run: npx next typegen --webpack
       - name: Type check
         run: npm run typecheck
       - name: Tests (handler real + clasificadores)
