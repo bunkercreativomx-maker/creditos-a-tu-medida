@@ -119,11 +119,15 @@ test("P1-2 audio: transcribe, clasifica como audio (no imagen) y responde al tex
     msg({ id: "m-cli", remitente: "cliente", contenido: "", media_type: "audio", media_url: url, created: "2026-09-13T09:05:00Z" }),
   ];
   const mock = makeMockPb({ messages: rows, leads: [{ id: "l1", nombre: "Juan Pérez" }], conversations: convSeed() });
-  const transcribes: string[] = [];
+  const transcribes: { url?: string | null; mediaId?: string | null; accountId?: string | null }[] = [];
   let history: { role: string; content: string }[] = [];
   const { deps, sent } = makeDeps(mock, {
-    transcribirAudio: async (u: string) => {
-      transcribes.push(u);
+    transcribirAudio: async (audio: {
+      url?: string | null;
+      mediaId?: string | null;
+      accountId?: string | null;
+    }) => {
+      transcribes.push(audio);
       return transcript;
     },
     runBotTurn: async (h) => {
@@ -150,7 +154,9 @@ test("P1-2 audio: transcribe, clasifica como audio (no imagen) y responde al tex
     deps
   );
 
-  assert.deepEqual(transcribes, [url], "llamó al STT con la URL del audio");
+  assert.equal(transcribes.length, 1, "llamó al STT con el adjunto de audio");
+  assert.equal(transcribes[0]?.url, url, "le pasó la url del adjunto");
+  assert.equal(transcribes[0]?.accountId, "za-cr", "le pasó el accountId (para descargar con credencial)");
   assert.ok(!history.some((m) => /imagen|foto/.test(m.content)), "el audio NO se clasificó como imagen");
   assert.equal(history.at(-1)?.content, transcript, "la transcripción es el texto del cliente en el historial");
   assert.match(sent[0], /servicios/, "respuesta congruente con el texto transcribido");

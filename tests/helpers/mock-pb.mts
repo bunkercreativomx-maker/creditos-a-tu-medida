@@ -61,10 +61,20 @@ export function makeMockPb(seed: Record<string, Record<string, unknown>[]> = {})
         .filter((r) => evalFilter(r, opts?.filter as string))
         .map((r) => ({ ...r }));
     },
-    async getOne(id: string) {
-      calls.push({ col, method: "getOne", args: [id] });
+    async getOne(id: string, opts?: Record<string, unknown>) {
+      calls.push({ col, method: "getOne", args: [id, opts] });
       const found = (collections[col] ?? []).find((r) => r.id === id);
       if (!found) throw new Error(`404 ${col}/${id}`);
+      return { ...found };
+    },
+    /**
+     * Primer registro que cumple el filtro. PocketBase real lanza 404 cuando no
+     * hay coincidencias (el código de producción lo trata con .catch(() => null)).
+     */
+    async getFirstListItem(filter: string, opts?: Record<string, unknown>) {
+      calls.push({ col, method: "getFirstListItem", args: [filter, opts] });
+      const found = (collections[col] ?? []).find((r) => evalFilter(r, filter));
+      if (!found) throw new Error(`404 ${col} (getFirstListItem)`);
       return { ...found };
     },
     async create(data: Record<string, unknown>) {
