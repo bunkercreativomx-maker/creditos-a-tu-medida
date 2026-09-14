@@ -78,13 +78,23 @@ export function makeMockPb(seed: Record<string, Record<string, unknown>[]> = {})
       const list = collections[col] ?? [];
       const idx = list.findIndex((r) => r.id === id);
       if (idx === -1) {
-        // Crear si no existe (tolerante), como conviene a algunos flujos.
-        const rec = { id, ...data } as MockRecord;
-        (collections[col] ??= []).push(rec);
-        return { ...rec };
+        // PocketBase real lanza 404 al actualizar un registro inexistente; el
+        // adaptador no debe divergir (antes lo creaba y "tapaba" tests que
+        // asumían conversaciones implícitas). Fiel al real.
+        throw new Error(`404 ${col}/${id}`);
       }
       list[idx] = { ...list[idx], ...data } as MockRecord;
       return { ...list[idx] };
+    },
+    async delete(id: string) {
+      calls.push({ col, method: "delete", args: [id] });
+      const list = collections[col] ?? [];
+      const idx = list.findIndex((r) => r.id === id);
+      if (idx === -1) {
+        throw new Error(`404 ${col}/${id}`);
+      }
+      const [removed] = list.splice(idx, 1);
+      return { ...removed };
     },
   });
 

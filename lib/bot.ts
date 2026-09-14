@@ -270,6 +270,32 @@ export type BotTurnResult = {
 /** Extiende BotTurnResult con un flag para el fallback anti-silencio (error técnico). */
 export type BotTurnResultWithError = BotTurnResult & { botError?: boolean };
 
+/**
+ * Fusiona los datos de un `guardar_datos_lead` en el acumulado del turno.
+ * Antes, cada llamada reemplazaba el objeto completo y las llamadas parciales
+ * (una con nombre, otra con dependencia) se pisaban y perdían campos ya
+ * capturados. Aquí solo se sobreescribe un campo cuando la nueva llamada trae
+ * un string para él; el resto se conserva.
+ */
+export function mergeLeadData(
+  prev: BotTurnResult["leadData"],
+  args: Record<string, unknown>
+): BotTurnResult["leadData"] {
+  const cur = prev ?? {};
+  const pick = (k: string) => (typeof args[k] === "string" ? (args[k] as string) : cur[k as keyof typeof cur]);
+  return {
+    nombre: pick("nombre") ?? null,
+    apellido: pick("apellido") ?? null,
+    estatus: pick("estatus") ?? null,
+    dependencia: pick("dependencia") ?? null,
+    nss: pick("nss") ?? null,
+    monto_solicitado: pick("monto_solicitado") ?? null,
+    credito_vigente: pick("credito_vigente") ?? null,
+    empresa_credito: pick("empresa_credito") ?? null,
+    antiguedad_credito: pick("antiguedad_credito") ?? null,
+  };
+}
+
 type ToolExecContext = {
   // Contexto adicional (ej. fecha/hora actual) que se inyecta tras el system prompt.
   contexto?: string;
@@ -376,21 +402,7 @@ export async function runBotTurn(
         if (typeof args?.motivo === "string") escalateReason = args.motivo;
         toolResults.push(JSON.stringify({ ok: true, escalado: true }));
       } else if (name === "guardar_datos_lead") {
-        leadData = {
-          nombre: typeof args?.nombre === "string" ? args.nombre : null,
-          apellido: typeof args?.apellido === "string" ? args.apellido : null,
-          estatus: typeof args?.estatus === "string" ? args.estatus : null,
-          dependencia: typeof args?.dependencia === "string" ? args.dependencia : null,
-          nss: typeof args?.nss === "string" ? args.nss : null,
-          monto_solicitado:
-            typeof args?.monto_solicitado === "string" ? args.monto_solicitado : null,
-          credito_vigente:
-            typeof args?.credito_vigente === "string" ? args.credito_vigente : null,
-          empresa_credito:
-            typeof args?.empresa_credito === "string" ? args.empresa_credito : null,
-          antiguedad_credito:
-            typeof args?.antiguedad_credito === "string" ? args.antiguedad_credito : null,
-        };
+        leadData = mergeLeadData(leadData, args);
         toolResults.push(JSON.stringify({ ok: true, guardado: true }));
       } else if (name === "consultar_disponibilidad" || name === "agendar_cita") {
         if (name === "agendar_cita") {

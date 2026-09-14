@@ -239,7 +239,7 @@ export function pareceIdentificador(texto: string): boolean {
 /** ¿El texto pide reagendar/cambiar una cita existente? */
 export function pideReagendar(texto: string): boolean {
   const t = (texto || "").toLowerCase();
-  return /(reagendar|re-agendar|reagenda|cambiar (mi )?cita|cambiar (mi )?hora|mover (la )?cita|otra hora|otro d[ií]a|m[aá]s tarde|adelantar|atrasar|no puedo|me queda mal|cancelar)/.test(t);
+  return /(reagendar|re-agendar|reagenda|cambiar (mi )?cita|cambiar (mi )?hora|mover (la )?cita|otra hora|otro d[ií]a|m[aá]s tarde|adelantar|atrasar|no puedo|me queda mal)/.test(t);
 }
 
 /**

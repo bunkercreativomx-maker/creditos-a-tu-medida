@@ -50,7 +50,7 @@ export type ParsedInbound = {
   nombre: string | null;
   conversationId: string | null; // Zernio conversation id (para responder)
   accountId: string | null; // Zernio account id (para responder)
-  attachments: { type: string; url: string }[]; // media adjunto (imagen, video, documento, etc.)
+  attachments: { type: string; url: string; payload?: { id?: string } }[]; // media adjunto (imagen, video, documento, etc.)
 };
 
 /**
@@ -134,11 +134,21 @@ export function parseInboundMessage(event: ZernioInboundEvent): ParsedInbound {
     const rawAttachments = Array.isArray(msg?.attachments) ? msg.attachments : [];
     const attachments = rawAttachments
       .map((a) => {
-        const t = (a as Record<string, unknown>)?.type;
-        const u = (a as Record<string, unknown>)?.url;
-        return typeof t === "string" && typeof u === "string" ? { type: t, url: u } : null;
+        const o = a as Record<string, unknown>;
+        const t = o?.type;
+        const u = o?.url;
+        // Conservamos payload.id: es el mediaId para descargar/transcribir audios.
+        const payload = o?.payload as { id?: unknown } | undefined;
+        const pid = typeof payload?.id === "string" ? payload.id : undefined;
+        if (typeof t !== "string" || typeof u !== "string") return null;
+        const item: { type: string; url: string; payload?: { id?: string } } = {
+          type: t,
+          url: u,
+        };
+        if (pid) item.payload = { id: pid };
+        return item;
       })
-      .filter((x): x is { type: string; url: string } => x !== null);
+      .filter((x): x is NonNullable<typeof x> => x !== null);
 
     return { text, telefono, nombre, conversationId, accountId, attachments };
   }

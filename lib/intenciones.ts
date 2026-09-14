@@ -57,30 +57,38 @@ export function esPreguntaDeAsesor(texto: string): boolean {
 }
 
 /**
- * ¿Pide la dirección / la ubicación de la oficina? Muy amplio a propósito: la
- * respuesta correcta ya está fija (una sola dirección oficial), así que un
- * falso positivo es inofensivo, mientras que un falso negativo deja al cliente
- * sin saber a dónde ir.
+ * ¿Pide la dirección / la ubicación de la oficina?
+ *
+ * La respuesta correcta ya está fija (una sola dirección oficial), así que un
+ * falso positivo es inofensivo PARA ESA RESPUESTA; el problema es que un
+ * falso positivo "se come" otras intenciones (p.ej. pedir asesor + dirección,
+ * o "el asesor anotó mi domicilio"). Por eso se endurece: un sustantivo suelto
+ * de lugar ("domicilio", "oficina", "sucursal") NO cuenta si no va acompañado
+ * de una pregunta o de un verbo de pedir/ir. "¿dónde están?" y "dame la
+ * dirección" sí cuentan.
  */
 export function pideUbicacion(texto: string): boolean {
   const t = normaliza(texto);
   if (!t) return false;
+
+  // Fuerte: verbo de movimiento o pregunta explícita de "dónde/cómo llegar".
   if (
-    /(ubicad|ubicacion|direccion|domicilio|sucursal|oficina|localiza|\bmapa\b|google maps|waze|coordenadas|en que (parte|lugar|colonia|zona|calle))/.test(
+    /(donde|adonde|a donde|en donde|como llegar|como llego|para llegar|tengo que ir|hay que ir|donde tengo que ir|a que (parte|lado|lugar|colonia|zona|calle)|en que (parte|lado|lugar|colonia|zona|calle)|que (parte|lado|lugar|colonia|zona|calle)|coordenadas|google maps|\bmapa\b|waze)/.test(
       t
     )
   ) {
     return true;
   }
-  if (/(como llegar|como llego|para llegar|tengo que ir|hay que ir|donde tengo que ir|a que parte)/.test(t)) {
-    return true;
-  }
-  if (/(a donde|adonde|donde)/.test(t)) {
-    return /(ir|voy|vamos|llegar|llego|estan|esta|es|queda|encuentro|encontrar|encuentran|los|las|les|tengo|hay|la cita|asisten|atienden|reciben)/.test(
-      t
-    );
-  }
-  return false;
+
+  // Un sustantivo de lugar ("domicilio", "oficina") solo cuenta acompañado de
+  // una pregunta o de un verbo de pedir/ir/dar (no lo confunde con "el asesor
+  // anotó mi domicilio").
+  const nucleo =
+    /(ubicad|ubicacion|direccion|domicilio|sucursal|oficina|localiz|parte|colonia|zona|calle)/;
+  if (!nucleo.test(t)) return false;
+  return /(cual|cuales|como|pregunt|saber|dime|digame|quiero|necesito|manda|mandame|dame|me da|pasa|pasame|comparte|enviame|direccion de|ubicacion de|la direccion|donde esta)/.test(
+    t
+  );
 }
 
 /** ¿Pregunta por SU cita ya agendada (día, hora o si sigue en pie)? */
@@ -88,6 +96,13 @@ export function preguntaPorSuCita(texto: string): boolean {
   const t = normaliza(texto);
   if (!t) return false;
   return /(mi cita|mi hora|la cita (que|quedo|qued)|que dia (me )?(quedo|tengo|es)|cuando es (mi|la) cita|a que hora (es|era|me quedo|tengo)|confirma(r)? (mi|la) cita|sigue (en pie|mi cita)|ya quedo la cita|que dia me toca)/.test(t);
+}
+
+/** ¿Pide cancelar/eliminar su cita? (debe atenderse ANTES que "pregunta por su cita"). */
+export function pideCancelarCita(texto: string): boolean {
+  const t = normaliza(texto);
+  if (!t) return false;
+  return /(cancelar|cancela|cancelala|cancelo|anular|anula|anulalo|elimina(r)? (mi |la )?cita|borra(r)? (mi |la )?cita|quita(r)? (mi |la )?cita|ya no quiero (mi |la )?cita|ya no voy a (ir|poder ir)|no voy a poder (ir|asistir))/i.test(t);
 }
 
 /** ¿Confirma que quiere agendar sin decir día ni hora? ("sí, agéndeme") */

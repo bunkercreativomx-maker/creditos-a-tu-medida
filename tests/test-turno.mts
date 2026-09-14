@@ -176,6 +176,7 @@ test("mensaje compuesto con pregunta de asesor → escala, no inventa", async ()
   const mock = makeMockPb({
     messages: seedMidConversation("Ya me autorizaron el préstamo? cuánto me van a prestar"),
     leads: [{ id: "l1", nombre: "Juan Pérez" }],
+    conversations: [{ id: C, bot_activo: true, necesita_asesor: false }],
   });
   const { deps, sent } = makeDeps(mock);
 
@@ -239,6 +240,7 @@ test("pedir hablar con una persona → avisa asesor y marca la conversación", a
   const mock = makeMockPb({
     messages: seedMidConversation("quiero hablar con una persona"),
     leads: [{ id: "l1", nombre: "Juan Pérez" }],
+    conversations: [{ id: C, bot_activo: true, necesita_asesor: false }],
   });
   const { deps, sent } = makeDeps(mock);
 
