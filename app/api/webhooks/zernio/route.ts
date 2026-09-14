@@ -12,6 +12,7 @@ import { createAdminClient } from "@/lib/pocketbase-admin";
 import { notifyNewLeadToSlack } from "@/lib/slack-notify";
 import { notifyNewLead, notifyNeedsAdvisor } from "@/lib/push";
 import { procesarTurnoBot } from "@/lib/turno";
+import { transcribirAudioUrl } from "@/lib/transcribe";
 
 // El trabajo pesado (LLM + envío) corre DESPUÉS de responder a Zernio (after()).
 export const maxDuration = 60;
@@ -180,6 +181,7 @@ export async function POST(req: NextRequest) {
         pb: pb as unknown as Parameters<typeof procesarTurnoBot>[1]["pb"],
         send: sendWhatsAppMessage,
         runBotTurn,
+        transcribirAudio: transcribirAudioUrl,
         notifyNeedsAdvisor,
         notifyNewLead,
         notifyNewLeadToSlack,
