@@ -50,7 +50,16 @@ export type ParsedInbound = {
   nombre: string | null;
   conversationId: string | null; // Zernio conversation id (para responder)
   accountId: string | null; // Zernio account id (para responder)
-  attachments: { type: string; url: string; payload?: { id?: string } }[]; // media adjunto (imagen, video, documento, etc.)
+  direction: string | null; // "incoming" | "outgoing" (solo diagnóstico)
+  // Media adjunto (imagen, video, audio, documento, sticker...).
+  // OJO: el `url` de un adjunto ENTRANTE de WhatsApp apunta al endpoint
+  // AUTENTICADO GET /v1/whatsapp/media/{mediaId} (ver lib/transcribe.ts).
+  attachments: {
+    type: string;
+    url: string;
+    originalType?: string;
+    payload?: { id?: string };
+  }[];
 };
 
 /**
@@ -100,14 +109,26 @@ export function parseInboundMessage(event: ZernioInboundEvent): ParsedInbound {
   const conv = event.conversation;
   const acc = event.account;
 
-  const text = (pick(msg, ["message", "text", "body"]) ??
-    pick(event.data, ["text"])) as string | null;
+  const textRaw = pick(msg, ["message", "text", "body"]) ?? pick(event.data, ["text"]);
+  // `text` es null (no undefined) cuando el mensaje no trae texto — así lo trata
+  // el resto del código (`text: null` + adjunto = nota de voz / foto sin caption).
+  const text =
+    typeof textRaw === "string" && textRaw.trim() ? (textRaw as string) : null;
 
-  // Número del cliente: WhatsApp llega como senderId / participantId (E.164).
+  // Número del cliente: WhatsApp llega como sender.id (teléfono sin `+`) o
+  // sender.phoneNumber (E.164) en message.sender, y como participantId/phone en
+  // conversation. Se mantiene el orden previo (conversation primero: es el que
+  // funcionaba en producción) y se agregan sender.id/phoneNumber como respaldo,
+  // porque durante el rollout de BSUID de WhatsApp `participantId` puede no ser
+  // un teléfono y sin respaldo el entrante se descartaba como "teléfono inválido".
+  const sender = msg?.sender as Record<string, unknown> | undefined;
   const telefono = (pick(msg, ["senderId", "senderPhone", "from"]) ??
     pick(conv, ["participantId", "phone", "from"]) ??
+    pick(sender, ["phoneNumber", "id"]) ??
     pick(event.data, ["from"]) ??
     (event.data?.sender && (event.data.sender.id ?? null))) as string | null;
+
+  const direction = (pick(msg, ["direction"]) as string | undefined) ?? null;
 
   const nombreRaw = (pick(msg, ["senderName", "sender", "name"]) ??
       pick(conv, ["participantName", "name"]) ??
@@ -129,8 +150,8 @@ export function parseInboundMessage(event: ZernioInboundEvent): ParsedInbound {
       pick(acc, ["id"]) ??
       pick(event.data, ["profile_id"])) as string | null;
 
-    // Adjuntos (imágenes, videos, documentos). El payload real trae
-    // message.attachments = [{ type: "image"|"video"|"audio"|"file"|..., url }].
+    // Adjuntos (imágenes, videos, audios, documentos). El payload real trae
+    // message.attachments = [{ type, url, payload?, originalType? }].
     const rawAttachments = Array.isArray(msg?.attachments) ? msg.attachments : [];
     const attachments = rawAttachments
       .map((a) => {
@@ -140,17 +161,22 @@ export function parseInboundMessage(event: ZernioInboundEvent): ParsedInbound {
         // Conservamos payload.id: es el mediaId para descargar/transcribir audios.
         const payload = o?.payload as { id?: unknown } | undefined;
         const pid = typeof payload?.id === "string" ? payload.id : undefined;
+        // originalType (solo Instagram/Facebook): el tipo de Meta antes de normalizar.
+        const orig = typeof o?.originalType === "string" ? o.originalType : undefined;
         if (typeof t !== "string" || typeof u !== "string") return null;
-        const item: { type: string; url: string; payload?: { id?: string } } = {
-          type: t,
-          url: u,
-        };
+        const item: {
+          type: string;
+          url: string;
+          originalType?: string;
+          payload?: { id?: string };
+        } = { type: t, url: u };
+        if (orig) item.originalType = orig;
         if (pid) item.payload = { id: pid };
         return item;
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);
 
-    return { text, telefono, nombre, conversationId, accountId, attachments };
+    return { text, telefono, nombre, conversationId, accountId, direction, attachments };
   }
 
 /**
