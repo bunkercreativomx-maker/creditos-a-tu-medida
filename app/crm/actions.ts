@@ -19,6 +19,9 @@ async function logAudit(
       actor,
       accion,
       detalle: detalle ?? null,
+      // lead_audit no tiene created/updated de sistema (import desde Supabase);
+      // lo escribimos explícitamente para poder ordenar por -created.
+      created: new Date().toISOString(),
     });
   } catch (err) {
     // No romper la acción principal si el log falla

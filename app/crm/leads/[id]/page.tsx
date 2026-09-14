@@ -63,7 +63,10 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     pb
       .collection("lead_audit")
       .getList(1, 200, { filter: `lead = "${id}"`, sort: "-created" })
-      .catch(() => ({ items: [] })),
+      .catch((err) => {
+        console.error(`[crm] error leyendo lead_audit de ${id}:`, err);
+        return { items: [] };
+      }),
     pb.collection("users").getList(1, 500, { sort: "id" }),
   ]);
 
