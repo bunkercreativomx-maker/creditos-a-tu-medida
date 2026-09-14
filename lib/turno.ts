@@ -37,6 +37,18 @@ import type { ParsedInbound } from "@/lib/zernio";
 /** Últimos N mensajes de contexto para el LLM (los MÁS RECIENTES, no los viejos). */
 const HISTORIA_MAX_MSGS = 30;
 
+/**
+ * Adjunto de audio entrante (forma que entrega Zernio). Para WhatsApp el `url`
+ * apunta al endpoint AUTENTICADO de Zernio, por eso hace falta el `mediaId`
+ * (`attachments[].payload.id`) y el `accountId` para descargar los bytes.
+ */
+export type AudioEntrante = {
+  url?: string | null;
+  mediaId?: string | null;
+  accountId?: string | null;
+  originalType?: string | null;
+};
+
 /** Superficie mínima de PocketBase que usa el turno (fácil de mockear). */
 export type TurnoPb = {
   collection(name: string): {
@@ -71,11 +83,12 @@ export type TurnoDeps = {
     }
   ) => Promise<BotTurnResult>;
   /**
-   * Transcribe una nota de voz entrante (STT). Recibe la URL pública del audio
-   * (media_url) y devuelve el texto, o null si no se pudo transcribir / no hay
-   * credencial. null => el turno deriva a asesor (nunca ignora el audio).
+   * Transcribe una nota de voz entrante (STT). Recibe el adjunto de audio como
+   * lo manda Zernio (url + mediaId (`payload.id`) + accountId) y devuelve el
+   * texto, o null si no se pudo transcribir / no hay credencial. null => el
+   * turno deriva a asesor (nunca ignora el audio ni lo trata como imagen).
    */
-  transcribirAudio?: (audioUrl: string) => Promise<string | null>;
+  transcribirAudio?: (audio: AudioEntrante) => Promise<string | null>;
   /** Aviso de "este lead/cliente necesita asesor" (push). */
   notifyNeedsAdvisor: (leadId?: string | null) => Promise<void>;
   /** Aviso de lead nuevo (push). */
@@ -250,13 +263,31 @@ export async function procesarTurnoBot(
     // 1. AUDIO: si el mensaje es una nota de voz sin texto, transcribimos. La
     // transcripción es texto del cliente; si falla, derivamos a asesor (nunca
     // la tratamos como imagen ni la ignoramos).
+    // OJO: el `url` del adjunto entrante de WhatsApp NO es público — apunta al
+    // endpoint autenticado de Zernio —, así que se pasan también mediaId y
+    // accountId para que el STT descargue los bytes con la credencial.
     let textoHoy = String(parsed.text ?? "").trim();
-    const audioAtt = (parsed.attachments ?? []).find((a) => a.type === "audio");
+    const esAudio = (t: string, original?: string | null) =>
+      /^(audio|voice|ptt|ogg|opus)$/i.test(t || "") || /^(audio|voice)$/i.test(original || "");
+    const audioAtt = (parsed.attachments ?? []).find((a) =>
+      esAudio(a.type, a.originalType ?? null)
+    );
     if (!textoHoy && audioAtt) {
-      const url = audioAtt.url;
+      const fuente: AudioEntrante = {
+        url: audioAtt.url ?? null,
+        mediaId: audioAtt.payload?.id ?? null,
+        accountId: pbAccountId,
+        originalType: audioAtt.originalType ?? null,
+      };
       let transcripcion: string | null = null;
-      if (transcribirAudio && url) {
-        transcripcion = await transcribirAudio(url);
+      if (transcribirAudio && (fuente.url || fuente.mediaId)) {
+        try {
+          transcripcion = await transcribirAudio(fuente);
+        } catch (err) {
+          // Un STT que revienta no puede tumbar el turno: se trata como fallo.
+          console.error("[turno] error transcribiendo la nota de voz:", err);
+          transcripcion = null;
+        }
       }
       if (transcripcion && transcripcion.trim()) {
         textoHoy = transcripcion.trim();
@@ -278,7 +309,7 @@ export async function procesarTurnoBot(
         // STT falló o no hay credencial: marcar no transcrito y derivar a asesor.
         console.error(
           "[turno] no se pudo transcribir la nota de voz; se deriva a asesor",
-          url ? `(media: ${url})` : "(sin url de media)"
+          fuente.mediaId ? `(mediaId presente)` : "(sin mediaId ni url utilizables)"
         );
         await responder(
           `Con gusto${corto0 ? `, ${corto0}` : ""}. Le pido una disculpa, no logré escuchar su nota de voz. Un asesor le responde por aquí en un momento.`
