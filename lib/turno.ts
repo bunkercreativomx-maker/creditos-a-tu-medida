@@ -1,7 +1,8 @@
 // Manejo determinista de un turno del bot (sin el HTTP/Signature/dedupe que vive
 // en la ruta del webhook). Separado de `route.ts` para poder probarlo de punta a
-// punta con adaptadores mock (PocketBase, envío, LLM y notificaciones), sin
-// duplicar la lógica en un harness. La ruta arma los adaptadores reales.
+// punta con adaptadores mock (PocketBase, envío, LLM, transcripción y
+// notificaciones), sin duplicar la lógica en un harness. La ruta arma los
+// adaptadores reales.
 
 import {
   proximoLunes,
@@ -24,6 +25,7 @@ import { DIRECCION_OFICIAL } from "@/lib/politicas";
 import {
   esPreguntaDeAsesor,
   preguntaPorSuCita,
+  pideCancelarCita,
   esAfirmacion,
   esCortesia,
   nombreCorto,
@@ -31,6 +33,9 @@ import {
 } from "@/lib/intenciones";
 import type { BotTurnResult, BotTurnResultWithError } from "@/lib/bot";
 import type { ParsedInbound } from "@/lib/zernio";
+
+/** Últimos N mensajes de contexto para el LLM (los MÁS RECIENTES, no los viejos). */
+const HISTORIA_MAX_MSGS = 30;
 
 /** Superficie mínima de PocketBase que usa el turno (fácil de mockear). */
 export type TurnoPb = {
@@ -48,6 +53,7 @@ export type TurnoPb = {
       data: Record<string, unknown>,
       opts?: Record<string, unknown>
     ): Promise<unknown>;
+    delete(id: string, opts?: Record<string, unknown>): Promise<unknown>;
   };
 };
 
@@ -64,6 +70,12 @@ export type TurnoDeps = {
       resolveTool: (name: string, args: Record<string, unknown>) => Promise<string>;
     }
   ) => Promise<BotTurnResult>;
+  /**
+   * Transcribe una nota de voz entrante (STT). Recibe la URL pública del audio
+   * (media_url) y devuelve el texto, o null si no se pudo transcribir / no hay
+   * credencial. null => el turno deriva a asesor (nunca ignora el audio).
+   */
+  transcribirAudio?: (audioUrl: string) => Promise<string | null>;
   /** Aviso de "este lead/cliente necesita asesor" (push). */
   notifyNeedsAdvisor: (leadId?: string | null) => Promise<void>;
   /** Aviso de lead nuevo (push). */
@@ -92,6 +104,14 @@ export type ProcesarTurnoArgs = {
   mensajeId?: string;
 };
 
+type Msg = {
+  id?: string;
+  remitente?: string;
+  contenido?: string;
+  media_type?: string | null;
+  created?: string;
+};
+
 /**
  * Trabajo pesado del turno: arma el historial, corre el bot (con fallbacks
  * deterministas por código) y responde al cliente. La ruta lo ejecuta en
@@ -110,36 +130,97 @@ export async function procesarTurnoBot(
     esRecurrente,
     mensajeId,
   } = args;
-  const { pb, send, runBotTurn, notifyNeedsAdvisor, notifyNewLead, notifyNewLeadToSlack } =
-    deps;
+  const {
+    pb,
+    send,
+    runBotTurn,
+    transcribirAudio,
+    notifyNeedsAdvisor,
+    notifyNewLead,
+    notifyNewLeadToSlack,
+  } = deps;
   const pbConversationId = parsed.conversationId;
   const pbAccountId = parsed.accountId;
 
   try {
-    // Historial reciente para el bot (10 msgs basta de contexto y no infla tokens).
-    const recentMessages = await pb.collection("messages").getList(1, 10, {
-      filter: `conversation = "${conversationId}"`,
-      sort: "created",
-    });
+    // Marca la conversación para intervención humana (sin tocar bot_activo).
+    const marcarParaAsesor = async () => {
+      await pb
+        .collection("conversations")
+        .update(conversationId, { necesita_asesor: true })
+        .catch(() => {});
+      await pb.collection("leads").update(leadId, { status: "en_seguimiento" }).catch(() => {});
+    };
 
-    const history = (
-      (recentMessages.items ?? []) as unknown as {
-        remitente: string;
-        contenido: string;
-        media_type?: string | null;
-      }[]
-    )
-      .filter((m) => m.remitente !== "asesor")
-      .map((m) => ({
-        role: (m.remitente === "cliente" ? "user" : "assistant") as "user" | "assistant",
-        content: m.media_type
-          ? `[El cliente envió una ${m.media_type === "image" ? "foto" : "imagen"}${m.contenido ? ` con el mensaje: ${m.contenido}` : ""}]`
-          : m.contenido,
-      }));
+    // Envío CON entrega verificada: manda primero y SOLO si llegó lo persiste.
+    // Nunca se guarda un mensaje del bot que no salió (defecto "envío fantasma").
+    const responder = async (msg: string): Promise<boolean> => {
+      const limpio = sanearDireccion(msg);
+      if (pbConversationId && pbAccountId) {
+        let enviado = false;
+        let lastErr: unknown = null;
+        for (let i = 0; i < 2 && !enviado; i++) {
+          try {
+            await send(pbConversationId, pbAccountId, limpio);
+            enviado = true;
+          } catch (e) {
+            lastErr = e;
+          }
+        }
+        if (!enviado) {
+          console.error("[turno] no se pudo entregar el mensaje:", lastErr);
+          await marcarParaAsesor();
+          await notifyNeedsAdvisor(leadId).catch(() => {});
+          return false;
+        }
+      } else {
+        // Sin destino (defensivo): no persistir un mensaje que nadie verá.
+        await marcarParaAsesor();
+        await notifyNeedsAdvisor(leadId).catch(() => {});
+        return false;
+      }
+      await pb.collection("messages").create({
+        conversation: conversationId,
+        remitente: "bot",
+        contenido: limpio,
+        created: new Date().toISOString(),
+      });
+      return true;
+    };
 
-    // GUARD ANTI-DOBLE-RESPUESTA: si el cliente mandó otro mensaje (o ya hay
-    // respuesta del bot) después del que disparó este turno, este turno sobra.
-    if (mensajeId) {
+    // 0. Historial: los ÚLTIMOS N mensajes (descendente), con reintento ante un
+    // fallo puntual de lectura de PocketBase.
+    let latestItems: Msg[];
+    try {
+      const res = await pb.collection("messages").getList(1, HISTORIA_MAX_MSGS, {
+        filter: `conversation = "${conversationId}"`,
+        sort: "-created",
+      });
+      latestItems = (res.items ?? []) as Msg[];
+    } catch (err) {
+      console.error("[turno] error leyendo historial (1er intento):", err);
+      try {
+        const res = await pb.collection("messages").getList(1, HISTORIA_MAX_MSGS, {
+          filter: `conversation = "${conversationId}"`,
+          sort: "-created",
+        });
+        latestItems = (res.items ?? []) as Msg[];
+      } catch (err2) {
+        console.error("[turno] error leyendo historial (2do intento):", err2);
+        // No podemos saber el contexto: respondemos honesto y derivamos.
+        await responder(
+          "Permítame un momento. Estoy teniendo una dificultad técnica para ver su historial; un asesor le responde por aquí en un momento."
+        );
+        await marcarParaAsesor();
+        await notifyNeedsAdvisor(leadId).catch(() => {});
+        return;
+      }
+    }
+
+    // Guard anti-doble-respuesta: si el mensaje más reciente ya NO es el que
+    // disparó este turno, sobra. (Reutilizable para re-verificar tras el LLM.)
+    const esObsoleto = async (): Promise<boolean> => {
+      if (!mensajeId) return false;
       const ultimo = await pb
         .collection("messages")
         .getList(1, 1, {
@@ -148,54 +229,152 @@ export async function procesarTurnoBot(
         })
         .catch(() => null);
       const masReciente = (ultimo?.items ?? [])[0] as { id?: string } | undefined;
-      if (masReciente?.id && masReciente.id !== mensajeId) {
-        console.log("[turno] turno obsoleto, lo maneja el mensaje más reciente");
+      return Boolean(masReciente?.id && masReciente.id !== mensajeId);
+    };
+
+    if (await esObsoleto()) {
+      console.log("[turno] turno obsoleto, lo maneja el mensaje más reciente");
+      return;
+    }
+
+    // Datos actuales del lead + textos que usan los manejadores deterministas.
+    const lead0 = (await pb.collection("leads").getOne(leadId).catch(() => null)) as
+      | { nombre?: string; institucion?: string }
+      | null;
+    const nombre0 = String(lead0?.nombre ?? parsed.nombre ?? "").trim();
+    const DIR_OFICIAL = DIRECCION_OFICIAL;
+    const corto0 = nombreCorto(String(lead0?.nombre ?? "").trim()) || nombreCorto(nombre0);
+    const leadActual = lead0;
+    const nombreLead = String(lead0?.nombre ?? parsed.nombre ?? "").trim();
+
+    // 1. AUDIO: si el mensaje es una nota de voz sin texto, transcribimos. La
+    // transcripción es texto del cliente; si falla, derivamos a asesor (nunca
+    // la tratamos como imagen ni la ignoramos).
+    let textoHoy = String(parsed.text ?? "").trim();
+    const audioAtt = (parsed.attachments ?? []).find((a) => a.type === "audio");
+    if (!textoHoy && audioAtt) {
+      const url = audioAtt.url;
+      let transcripcion: string | null = null;
+      if (transcribirAudio && url) {
+        transcripcion = await transcribirAudio(url);
+      }
+      if (transcripcion && transcripcion.trim()) {
+        textoHoy = transcripcion.trim();
+        // Persistir el texto utilizable para que turnos futuros lo lean.
+        if (mensajeId) {
+          await pb
+            .collection("messages")
+            .update(mensajeId, { contenido: textoHoy, media_type: "audio" })
+            .catch(() => {});
+        }
+        // Reflejarlo también en el historial de ESTE turno.
+        for (const m of latestItems) {
+          if (m.id === mensajeId) {
+            m.contenido = textoHoy;
+            m.media_type = "audio";
+          }
+        }
+      } else {
+        // STT falló o no hay credencial: marcar no transcrito y derivar a asesor.
+        console.error(
+          "[turno] no se pudo transcribir la nota de voz; se deriva a asesor",
+          url ? `(media: ${url})` : "(sin url de media)"
+        );
+        await responder(
+          `Con gusto${corto0 ? `, ${corto0}` : ""}. Le pido una disculpa, no logré escuchar su nota de voz. Un asesor le responde por aquí en un momento.`
+        );
+        await marcarParaAsesor();
+        await notifyNeedsAdvisor(leadId).catch(() => {});
         return;
       }
     }
 
-    // Datos actuales del lead + textos que usan los manejadores deterministas.
-    const lead0 = await pb.collection("leads").getOne(leadId).catch(() => null);
-    const nombre0 = String((lead0 as { nombre?: string } | null)?.nombre ?? parsed.nombre ?? "").trim();
-    const textoHoy = String(parsed.text ?? "").trim();
-    const DIR_OFICIAL = DIRECCION_OFICIAL;
-    // Nombre corto (un cliente se llama "José Antonio Hernández Vázquez" y el
-    // bot repetía el nombre completo en CADA mensaje).
-    const corto0 =
-      nombreCorto(String((lead0 as { nombre?: string } | null)?.nombre ?? "").trim()) ||
-      nombreCorto(nombre0);
-    // Responde por WhatsApp y guarda el mensaje. Un solo camino para todos los
-    // manejadores deterministas.
-    const responder = async (msg: string) => {
-      const limpio = sanearDireccion(msg);
-      await pb.collection("messages").create({
-        conversation: conversationId,
-        remitente: "bot",
-        contenido: limpio,
-        created: new Date().toISOString(),
+    // Historial en orden cronológico (ascendente), con clasificación correcta
+    // del media: audio transcrito = texto del cliente; imagen = foto; etc.
+    const history = latestItems
+      .slice()
+      .reverse()
+      .filter((m) => m.remitente !== "asesor")
+      .map((m) => {
+        const role = (m.remitente === "cliente" ? "user" : "assistant") as "user" | "assistant";
+        const content = m.contenido ?? "";
+        const mt = m.media_type;
+        if (mt === "image") {
+          return { role, content: `[El cliente envió una foto${content ? ` con el mensaje: ${content}` : ""}]` };
+        }
+        if (mt === "audio") {
+          return { role, content: content.trim() ? content : "[El cliente envió una nota de voz sin transcribir]" };
+        }
+        if (mt) {
+          return { role, content: `[El cliente envió un archivo ${mt}${content ? ` con el mensaje: ${content}` : ""}]` };
+        }
+        return { role, content };
       });
-      if (pbConversationId && pbAccountId) {
-        await send(pbConversationId, pbAccountId, limpio).catch(() => {});
-      }
-    };
 
     // ¿Primer mensaje del bot en esta conversación? (el saludo va fijo)
-    const esPrimerTurno = !(recentMessages.items ?? []).some(
-      (m) => (m as { remitente?: string }).remitente === "bot"
-    );
+    const esPrimerTurno = !latestItems.some((m) => m.remitente === "bot");
+
+    // MANEJADOR 0 — PETICIÓN COMPUESTA: pedir asesor Y la dirección se atiende
+    // completa (no se pierde la solicitud humana).
+    if (esPreguntaDeAsesor(textoHoy) && pideUbicacion(textoHoy)) {
+      const msg = esPrimerTurno
+        ? `¡Hola! Buen día 👋 Le saluda Créditos a tu medida. Estamos en ${DIR_OFICIAL}. Y con gusto, esa información se la da directamente un asesor para que sea exacta; permítame comunicarlo, en un momento le responden por aquí.`
+        : `Con gusto${corto0 ? `, ${corto0}` : ""}. Estamos en ${DIR_OFICIAL}. Y esa información se la da directamente un asesor para que sea exacta; permítame comunicarlo, en un momento le responden por aquí.`;
+      await responder(msg);
+      await marcarParaAsesor();
+      await notifyNeedsAdvisor(leadId).catch(() => {});
+      return;
+    }
 
     // MANEJADOR 0 — PREGUNTA QUE SOLO UN ASESOR PUEDE CONTESTAR (BLOQUE 8).
-    if (esPreguntaDeAsesor(textoHoy) && !pideUbicacion(textoHoy)) {
+    if (esPreguntaDeAsesor(textoHoy)) {
       const msg = esPrimerTurno
         ? "¡Hola! Buen día 👋 Le saluda Créditos a tu medida. Con gusto, esa información se la da directamente un asesor para que sea exacta. Permítame comunicarlo, en un momento le responden por aquí."
         : `Con gusto${corto0 ? `, ${corto0}` : ""}. Esa información se la da directamente un asesor para que sea exacta. Permítame comunicarlo, en un momento le responden por aquí.`;
       await responder(msg);
-      await pb
-        .collection("conversations")
-        .update(conversationId, { necesita_asesor: true })
-        .catch(() => {});
-      await pb.collection("leads").update(leadId, { status: "en_seguimiento" }).catch(() => {});
+      await marcarParaAsesor();
       await notifyNeedsAdvisor(leadId).catch(() => {});
+      return;
+    }
+
+    // MANEJADOR 0A — CANCELAR / CAMBIAR cita (antes que "pregunta por su cita",
+    // que antes se tragaba "mi cita" y confirmaba la cita vieja).
+    const quiereCancelar = pideCancelarCita(textoHoy);
+    const quiereReagendar = pideReagendar(textoHoy);
+    if (quiereCancelar || quiereReagendar) {
+      const susCitas = (await pb
+        .collection("citas")
+        .getFullList({ filter: `lead = "${leadId}"` })
+        .catch(() => [])) as unknown as { id?: string; fecha?: string }[];
+      const cita = susCitas.find((c) => c.fecha);
+      if (quiereCancelar) {
+        if (cita?.id) {
+          await pb.collection("citas").delete(cita.id).catch((e) => {
+            console.error("[turno] error cancelando cita:", e);
+          });
+        }
+        await responder(
+          "Sin problema, queda cancelada. Cuando guste la reagendamos, aquí estoy. ¡Que tenga excelente día!"
+        );
+        return;
+      }
+      // quiereReagendar: intenta la vía determinista (actualiza la cita existente).
+      const respAgenda = await intentarAgendarDeterminista(
+        textoHoy,
+        nombreLead,
+        leadActual,
+        corto0,
+        telefono,
+        pb,
+        leadId,
+        DIR_OFICIAL,
+        true
+      );
+      if (respAgenda) {
+        await responder(respAgenda);
+      } else {
+        await responder(`Claro${corto0 ? `, ${corto0}` : ""}, ¿para qué día y hora le gustaría la nueva cita?`);
+      }
       return;
     }
 
@@ -236,11 +415,8 @@ export async function procesarTurnoBot(
     }
 
     // ¿El último mensaje del bot ofreció agendar / dio horarios? Sirve para
-    // interpretar un "sí" del cliente como "sí, agéndeme". (El bot ya NO pide
-    // identificadores — ver política de minimización en lib/politicas.ts.)
-    const ultimoBot = [...(recentMessages.items ?? [])]
-      .reverse()
-      .find((m) => (m as { remitente?: string }).remitente === "bot") as
+    // interpretar un "sí" del cliente como "sí, agéndeme".
+    const ultimoBot = latestItems.find((m) => m.remitente === "bot") as
       | { contenido?: string }
       | undefined;
     const botOfrecioCita =
@@ -251,7 +427,7 @@ export async function procesarTurnoBot(
     // SALUDO FIJO en el primer turno (el LLM alucina el nombre comercial).
     let esSesionNueva = esPrimerTurno;
     if (!esPrimerTurno && esRecurrente) {
-      const items = (recentMessages.items ?? []) as unknown as { created?: string }[];
+      const items = latestItems as { created?: string }[];
       const ultimo = items
         .map((m) => (m.created ? new Date(m.created).getTime() : 0))
         .reduce((a, b) => Math.max(a, b), 0);
@@ -260,34 +436,16 @@ export async function procesarTurnoBot(
     if (esSesionNueva) {
       let nombreCliente = "";
       if (esRecurrente) {
-        const l = await pb.collection("leads").getOne(leadId).catch(() => null);
-        nombreCliente = String((l as { nombre?: string } | null)?.nombre ?? "").trim();
+        const l = (await pb.collection("leads").getOne(leadId).catch(() => null)) as
+          | { nombre?: string }
+          | null;
+        nombreCliente = String(l?.nombre ?? "").trim();
       }
       const saludo =
         esRecurrente && nombreCliente
           ? `¡Hola de nuevo, ${nombreCliente}! 👋 Le saluda Créditos a tu medida. Qué gusto que se comunique otra vez. Ya tengo sus datos registrados, así que podemos ir directo. ¿En qué le puedo ayudar hoy?`
           : "¡Hola! Buen día 👋 Le saluda Créditos a tu medida. Con gusto le ayudo con su información de préstamo. ¿Me regala su nombre completo, por favor?";
-      await pb.collection("messages").create({
-        conversation: conversationId,
-        remitente: "bot",
-        contenido: saludo,
-        created: new Date().toISOString(),
-      });
-      if (pbConversationId && pbAccountId) {
-        try {
-          await send(pbConversationId, pbAccountId, saludo);
-        } catch (e) {
-          console.error("[turno] fallo enviando saludo fijo:", e);
-          await pb
-            .collection("conversations")
-            .update(conversationId, { bot_activo: false, necesita_asesor: true })
-            .catch(() => {});
-          await pb
-            .collection("leads")
-            .update(leadId, { status: "en_seguimiento" })
-            .catch(() => {});
-        }
-      }
+      await responder(saludo);
       if (esLeadNuevo) {
         await notifyNewLeadToSlack({
           nombre: parsed.nombre ?? null,
@@ -339,6 +497,22 @@ export async function procesarTurnoBot(
         botError: true,
       } as BotTurnResultWithError;
     });
+
+    // RE-VERIFICACIÓN de obsolescencia/takeover ANTES de efectos y envío: si
+    // llegó un mensaje nuevo o un asesor tomó la conversación durante el await
+    // del LLM, este turno sobra.
+    if (await esObsoleto()) {
+      console.log("[turno] turno quedó obsoleto durante el LLM, se descarta");
+      return;
+    }
+    const convTrasLlm = (await pb
+      .collection("conversations")
+      .getOne(conversationId)
+      .catch(() => null)) as { necesita_asesor?: boolean; bot_activo?: boolean } | null;
+    if (convTrasLlm && (convTrasLlm.necesita_asesor || convTrasLlm.bot_activo === false)) {
+      console.log("[turno] asesor tomó la conversación durante el await, se descarta");
+      return;
+    }
 
     // Datos de calificación -> campos del lead.
     if (botResult.leadData) {
@@ -395,138 +569,33 @@ export async function procesarTurnoBot(
     const resultWithError = botResult as BotTurnResultWithError;
     const botFallo = resultWithError.botError || !botResult.reply || !botResult.reply.trim();
 
-    const marcarParaAsesor = async () => {
-      await pb
-        .collection("conversations")
-        .update(conversationId, { necesita_asesor: true })
-        .catch(() => {});
-      await pb.collection("leads").update(leadId, { status: "en_seguimiento" }).catch(() => {});
-    };
-
-    const enviarMensajeBot = async (texto: string) => {
-      if (!pbConversationId || !pbAccountId) throw new Error("sin destino para enviar");
-      const textoLimpio = sanearDireccion(texto);
-      await send(pbConversationId, pbAccountId, textoLimpio);
-      await pb.collection("messages").create({
-        conversation: conversationId,
-        remitente: "bot",
-        contenido: textoLimpio,
-        created: new Date().toISOString(),
-      });
-    };
-
-    const leadActual = await pb
-      .collection("leads")
-      .getOne(leadId)
-      .catch(() => null) as unknown as { nombre?: string; institucion?: string } | null;
-    const nombreLead = String(
-      leadActual?.nombre ?? parsed.nombre ?? ""
-    ).trim();
-
-    const cierreB = `Perfecto, ${nombreLead}. Ya quedó registrada su información. Un asesor se pondrá en contacto con usted lo antes posible para darle todos los detalles. Quedo pendiente por aquí por cualquier cosa. ¡Excelente día!`
-      .replace(/\s+/g, " ")
-      .trim();
-
-    // ===== AGENDADO DETERMINISTA (fallback si Gemini no agenda) =====
-    const textoCliente = String(parsed.text ?? "").trim();
-
-    const cortoDe = (n: string) => nombreCorto(n) || n;
-
-    const intentarAgendarDeterminista = async (forzar = false): Promise<string | null> => {
-      if (!nombreLead) return null;
-      if (!forzar && !pideAgendar(textoCliente)) return null;
-
-      // MINIMIZACIÓN DE DATOS: no se pide identificador antes de agendar.
-      const hoy = hoyJuarez();
-      const horaPedida = extraerHora(textoCliente);
-      const fechaPedida = detectarDia(textoCliente);
-
-      const leerOcupadas = async (fecha: string): Promise<string[]> => {
-        const occ = await pb
-          .collection("citas")
-          .getFullList({ filter: `fecha ~ "${fecha}"` })
-          .catch(() => []);
-        return (occ as unknown as { fecha?: string }[])
-          .map((c) => c.fecha?.slice(11, 16))
-          .filter(Boolean) as string[];
-      };
-
-      const filtrarLibres = (libres: string[], fecha: string): string[] => {
-        let out = libres;
-        if (fecha === hoy.iso) out = recortarHorasPasadas(out, hoy.hora);
-        return out.slice(0, 2);
-      };
-
-      // Caso 1: el cliente dio una hora concreta (con o sin día).
-      if (horaPedida) {
-        const fecha = fechaPedida ?? proximoLunes();
-        if (fecha === hoy.iso && horaPedida <= hoy.hora) {
-          const ocupadas = await leerOcupadas(fecha);
-          const libres = filtrarLibres(horariosLibres(ocupadas, fecha), fecha);
-          if (libres.length === 0) return null;
-          return `Esa hora ya pasó hoy. Le puedo ofrecer las ${libres[0]} o las ${libres[1]} de hoy. 📍 ${DIR_OFICIAL}.`;
-        }
-        if (!horaEnHorarioDia(fecha, horaPedida)) {
-          const slots = horariosParaDia(fecha);
-          const ocupadasG = await leerOcupadas(fecha);
-          const libresG = filtrarLibres(horariosLibres(ocupadasG, fecha), fecha);
-          if (libresG.length === 0) return null;
-          return `A esa hora no tenemos cita, ${cortoDe(nombreLead)}. Atendemos de ${slots[0]} a ${slots[slots.length - 1]}. Le puedo ofrecer las ${libresG[0]} o las ${libresG[1]} del ${diaSemanaEsp(fecha)}. 📍 ${DIR_OFICIAL}.`;
-        }
-        const ocupadas = await leerOcupadas(fecha);
-        if (!ocupadas.includes(horaPedida)) {
-          const iso = horaLocalAUtc(fecha, horaPedida);
-          try {
-            const existing = await pb
-              .collection("citas")
-              .getFullList({ filter: `lead = "${leadId}"` })
-              .catch(() => [] as unknown as { id: string }[]);
-            if ((existing as { id: string }[]).length > 0) {
-              const citaId = (existing as { id: string }[])[0].id;
-              await pb.collection("citas").update(citaId, {
-                titulo: `Cita préstamo — ${nombreLead} — ${String(leadActual?.institucion ?? "")}`,
-                fecha: iso,
-                notas: `Reagendada por código. Tel: ${telefono}`,
-              });
-            } else {
-              await pb.collection("citas").create({
-                lead: leadId,
-                titulo: `Cita préstamo — ${nombreLead} — ${String(leadActual?.institucion ?? "")}`,
-                fecha: iso,
-                tipo: "cita",
-                notas: `Agendada por código (fallback determinista). Tel: ${telefono}`,
-                asignado_a: null,
-              });
-            }
-          } catch (err) {
-            console.error("[turno] error creando/actualizando cita determinista:", err);
-            return null;
-          }
-          return `¡Listo, ${cortoDe(nombreLead)}! Su cita queda confirmada: 📅 ${fechaEsp(fecha)} a las ${horaPedida} 📍 ${DIR_OFICIAL}. Un asesor lo estará esperando. Si necesita cambiar la cita, solo escríbame por aquí.`;
-        }
-        const libres = filtrarLibres(horariosLibres(ocupadas, fecha), fecha);
-        if (libres.length === 0) return null;
-        return `A esa hora ya está apartado. Le puedo ofrecer las ${libres[0]} o las ${libres[1]} el ${diaSemanaEsp(fecha)} ${fecha.slice(8, 10)}. 📍 ${DIR_OFICIAL}.`;
-      }
-
-      // Caso 2: pidió agendar sin hora concreta ni día → por defecto el lunes.
-      const fecha = fechaPedida ?? proximoLunes();
-      const ocupadas = await leerOcupadas(fecha);
-      const libres = filtrarLibres(horariosLibres(ocupadas, fecha), fecha);
-      if (libres.length === 0) return null;
-      const finSemana = fecha === hoy.iso ? " hoy" : ` el ${fechaEsp(fecha)}`;
-      return `Claro, ${cortoDe(nombreLead)}. Para su cita${finSemana} tengo disponible a las ${libres[0]} o a las ${libres[1]}. ¿Cuál le acomoda? 📍 Estamos en ${DIR_OFICIAL}.`;
-    };
+    const textoCliente = textoHoy;
 
     try {
       if (botFallo) {
-        const respAgenda = await intentarAgendarDeterminista(true);
-        if (respAgenda) {
-          await enviarMensajeBot(respAgenda);
-        } else if (esCortesia(textoCliente)) {
-          await enviarMensajeBot(`Con mucho gusto${corto0 ? `, ${corto0}` : ""}. Quedo a sus órdenes.`);
+        // FALLO TÉCNICO ≠ CONSENTIMIENTO: nunca agendar/ofrecer cita por defecto.
+        // Solo se agenda si el cliente lo pidió explícitamente.
+        if (pideAgendar(textoCliente) || pideReagendar(textoCliente)) {
+          const respAgenda = await intentarAgendarDeterminista(
+            textoCliente,
+            nombreLead,
+            leadActual,
+            corto0,
+            telefono,
+            pb,
+            leadId,
+            DIR_OFICIAL,
+            true
+          );
+          if (respAgenda) {
+            await responder(respAgenda);
+            return;
+          }
+        }
+        if (esCortesia(textoCliente)) {
+          await responder(`Con mucho gusto${corto0 ? `, ${corto0}` : ""}. Quedo a sus órdenes.`);
         } else {
-          await enviarMensajeBot(
+          await responder(
             `Permítame un momento${corto0 ? `, ${corto0}` : ""}. Estoy revisando su información con el equipo; un asesor le responde por aquí en un momento.`
           );
           await marcarParaAsesor();
@@ -542,13 +611,23 @@ export async function procesarTurnoBot(
           (leadListo && pareceHoraODia(textoCliente)) ||
           (esAfirmacion(textoCliente) && botOfrecioCita);
         if (forzarAgenda) {
-          const respAgenda = await intentarAgendarDeterminista(true);
+          const respAgenda = await intentarAgendarDeterminista(
+            textoCliente,
+            nombreLead,
+            leadActual,
+            corto0,
+            telefono,
+            pb,
+            leadId,
+            DIR_OFICIAL,
+            true
+          );
           if (respAgenda) {
-            await enviarMensajeBot(respAgenda);
+            await responder(respAgenda);
             return;
           }
         }
-        await enviarMensajeBot(botResult.reply!);
+        await responder(botResult.reply!);
         if (botResult.escalate) {
           await marcarParaAsesor();
           await notifyNeedsAdvisor(leadId);
@@ -556,15 +635,10 @@ export async function procesarTurnoBot(
       }
     } catch (err) {
       console.error("[turno] error enviando respuesta, se intenta fallback:", err);
-      try {
-        if (pbConversationId && pbAccountId) {
-          await send(pbConversationId, pbAccountId, cierreB).catch((e2) => {
-            console.error("[turno] fallback de envío también falló:", e2);
-          });
-        }
-      } finally {
-        await marcarParaAsesor();
-      }
+      // responder() ya deriva a asesor si el envío falla; aquí solo aseguramos
+      // la marca (idempotente).
+      await marcarParaAsesor();
+      await notifyNeedsAdvisor(leadId).catch(() => {});
     }
 
     if (esLeadNuevo) {
@@ -583,4 +657,107 @@ export async function procesarTurnoBot(
   } catch (err) {
     console.error("[turno] error fatal en procesarTurnoBot:", err);
   }
+}
+
+/**
+ * Agendado determinista (fallback por código, sin LLM). Devuelve el texto a
+ * enviar o null. `forzar` permite usarlo sin `pideAgendar` (reagendar o el
+ * fallback). Extraído a función para reutilizarlo en cancelar/cambiar y en el
+ * fallback honesto.
+ */
+async function intentarAgendarDeterminista(
+  textoCliente: string,
+  nombreLead: string,
+  leadActual: { nombre?: string; institucion?: string } | null,
+  corto0: string,
+  telefono: string,
+  pb: TurnoPb,
+  leadId: string,
+  DIR_OFICIAL: string,
+  forzar: boolean
+): Promise<string | null> {
+  if (!nombreLead) return null;
+  if (!forzar && !pideAgendar(textoCliente)) return null;
+
+  const hoy = hoyJuarez();
+  const horaPedida = extraerHora(textoCliente);
+  const fechaPedida = detectarDia(textoCliente);
+
+  const leerOcupadas = async (fecha: string): Promise<string[]> => {
+    const occ = await pb
+      .collection("citas")
+      .getFullList({ filter: `fecha ~ "${fecha}"` })
+      .catch(() => []);
+    return (occ as unknown as { fecha?: string }[])
+      .map((c) => c.fecha?.slice(11, 16))
+      .filter(Boolean) as string[];
+  };
+
+  const filtrarLibres = (libres: string[], fecha: string): string[] => {
+    let out = libres;
+    if (fecha === hoy.iso) out = recortarHorasPasadas(out, hoy.hora);
+    return out.slice(0, 2);
+  };
+
+  const cortoDe = (n: string) => nombreCorto(n) || n;
+
+  // Caso 1: el cliente dio una hora concreta (con o sin día).
+  if (horaPedida) {
+    const fecha = fechaPedida ?? proximoLunes();
+    if (fecha === hoy.iso && horaPedida <= hoy.hora) {
+      const ocupadas = await leerOcupadas(fecha);
+      const libres = filtrarLibres(horariosLibres(ocupadas, fecha), fecha);
+      if (libres.length === 0) return null;
+      return `Esa hora ya pasó hoy. Le puedo ofrecer las ${libres[0]} o las ${libres[1]} de hoy. 📍 ${DIR_OFICIAL}.`;
+    }
+    if (!horaEnHorarioDia(fecha, horaPedida)) {
+      const slots = horariosParaDia(fecha);
+      const ocupadasG = await leerOcupadas(fecha);
+      const libresG = filtrarLibres(horariosLibres(ocupadasG, fecha), fecha);
+      if (libresG.length === 0) return null;
+      return `A esa hora no tenemos cita, ${cortoDe(nombreLead)}. Atendemos de ${slots[0]} a ${slots[slots.length - 1]}. Le puedo ofrecer las ${libresG[0]} o las ${libresG[1]} del ${diaSemanaEsp(fecha)}. 📍 ${DIR_OFICIAL}.`;
+    }
+    const ocupadas = await leerOcupadas(fecha);
+    if (!ocupadas.includes(horaPedida)) {
+      const iso = horaLocalAUtc(fecha, horaPedida);
+      try {
+        const existing = await pb
+          .collection("citas")
+          .getFullList({ filter: `lead = "${leadId}"` })
+          .catch(() => [] as unknown as { id: string }[]);
+        if ((existing as { id: string }[]).length > 0) {
+          const citaId = (existing as { id: string }[])[0].id;
+          await pb.collection("citas").update(citaId, {
+            titulo: `Cita préstamo — ${nombreLead} — ${String(leadActual?.institucion ?? "")}`,
+            fecha: iso,
+            notas: `Reagendada por código. Tel: ${telefono}`,
+          });
+        } else {
+          await pb.collection("citas").create({
+            lead: leadId,
+            titulo: `Cita préstamo — ${nombreLead} — ${String(leadActual?.institucion ?? "")}`,
+            fecha: iso,
+            tipo: "cita",
+            notas: `Agendada por código (fallback determinista). Tel: ${telefono}`,
+            asignado_a: null,
+          });
+        }
+      } catch (err) {
+        console.error("[turno] error creando/actualizando cita determinista:", err);
+        return null;
+      }
+      return `¡Listo, ${cortoDe(nombreLead)}! Su cita queda confirmada: 📅 ${fechaEsp(fecha)} a las ${horaPedida} 📍 ${DIR_OFICIAL}. Un asesor lo estará esperando. Si necesita cambiar la cita, solo escríbame por aquí.`;
+    }
+    const libres = filtrarLibres(horariosLibres(ocupadas, fecha), fecha);
+    if (libres.length === 0) return null;
+    return `A esa hora ya está apartado. Le puedo ofrecer las ${libres[0]} o las ${libres[1]} el ${diaSemanaEsp(fecha)} ${fecha.slice(8, 10)}. 📍 ${DIR_OFICIAL}.`;
+  }
+
+  // Caso 2: pidió agendar sin hora concreta ni día → por defecto el lunes.
+  const fecha = fechaPedida ?? proximoLunes();
+  const ocupadas = await leerOcupadas(fecha);
+  const libres = filtrarLibres(horariosLibres(ocupadas, fecha), fecha);
+  if (libres.length === 0) return null;
+  const finSemana = fecha === hoy.iso ? " hoy" : ` el ${fechaEsp(fecha)}`;
+  return `Claro, ${cortoDe(nombreLead)}. Para su cita${finSemana} tengo disponible a las ${libres[0]} o a las ${libres[1]}. ¿Cuál le acomoda? 📍 Estamos en ${DIR_OFICIAL}.`;
 }
