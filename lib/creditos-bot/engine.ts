@@ -94,7 +94,8 @@ export class ConversationEngine {
         return { messages: [msg.occupied(booked.alternatives, lang)], escalate: false };
       }
       await this.leads.update(lead.id, { cita_propuesta_fecha: null, cita_propuesta_hora: null });
-      return { messages: msg.confirmed(lead, formatLocalAppointment(booked.appointment.fecha).label, lang), escalate: false };
+      // Cita agendada: el asesor debe ser notificado para darle seguimiento.
+      return { messages: msg.confirmed(lead, formatLocalAppointment(booked.appointment.fecha).label, lang), escalate: false, appointed: true };
     }
 
     if (!proposedDate) return { messages: [msg.askDay(lang)], escalate: false };

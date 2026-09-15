@@ -93,5 +93,7 @@ export interface TurnResult {
   escalate: boolean;
   ignored?: "bot_inactive" | "obsolete_message";
   leadPatch?: Partial<LeadData>;
+  /** true cuando este turno agendó/confirmó una cita (el asesor debe saberlo). */
+  appointed?: boolean;
 }
 

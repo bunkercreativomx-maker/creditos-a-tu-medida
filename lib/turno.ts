@@ -357,6 +357,21 @@ export async function procesarTurnoBot(
           text: textoHoy,
           history: history.slice(0, -1),
         });
+        // Lead nuevo de WhatsApp: avisar al asesor (pipeline + push + Slack),
+        // igual que hacia el flujo viejo al crear la conversación.
+        if (esLeadNuevo) {
+          await notifyNewLeadToSlack({
+            nombre: parsed.nombre ?? null,
+            telefono,
+            origen: "whatsapp",
+            leadId,
+          }).catch(() => {});
+          await notifyNewLead({
+            nombre: parsed.nombre ?? null,
+            apellido: null,
+            monto_aproximado: null,
+          }).catch(() => {});
+        }
       } catch (err) {
         console.error("[turno] error en el motor nuevo; requiere asesor:", err);
         await marcarParaAsesor();

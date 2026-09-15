@@ -65,7 +65,7 @@ export async function runNewEngineTurn(args: {
     }).catch(() => {});
   }
 
-  if (result.escalate) {
+  if (result.escalate || result.appointed) {
     await pb.collection("conversations")
       .update(args.conversationId, { necesita_asesor: true })
       .catch(() => {});
