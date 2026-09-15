@@ -6,6 +6,8 @@ export interface LeadData {
   id: string;
   telefono?: string | null;
   nombre?: string | null;
+  /** Solo true cuando el cliente proporcionó su nombre; nunca desde WhatsApp. */
+  nombre_confirmado?: boolean;
   estatus?: EstadoJubilacion | null;
   dependencia?: Dependencia | null;
   dependencia_otra?: string | null;
