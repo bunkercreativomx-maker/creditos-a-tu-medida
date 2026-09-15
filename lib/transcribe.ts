@@ -113,7 +113,14 @@ function normalizarFuente(audio: AudioSource | null | undefined): AdjuntoAudio |
 
 /** ¿La URL apunta al endpoint autenticado de Zernio (no a un CDN público)? */
 export function esRutaMediaZernio(url: string | null | undefined): boolean {
-  return typeof url === "string" && /\/whatsapp\/media\//i.test(url);
+  if (typeof url !== "string") return false;
+  try {
+    const target = new URL(url);
+    const base = new URL(ZERNIO_API_BASE);
+    const prefix = `${base.pathname.replace(/\/$/, "")}/v1/whatsapp/media/`;
+    return target.protocol === "https:" && target.origin === base.origin &&
+      !target.username && !target.password && target.pathname.startsWith(prefix);
+  } catch { return false; }
 }
 
 /** URL autenticada de descarga del media de WhatsApp. */
@@ -125,9 +132,8 @@ export function urlMediaZernio(mediaId: string, accountId: string): string {
 
 /**
  * Obtiene los BYTES del audio. Nunca asume que la URL del adjunto es pública:
- * primero intenta el endpoint autenticado de Zernio con el `mediaId`, y solo si
- * eso no aplica (o falla) cae a una descarga directa de la URL cuando ésta no
- * apunta al endpoint autenticado.
+ * usa el mediaId o una URL del mismo endpoint autenticado de Zernio.
+ * Las URLs externas se rechazan para evitar SSRF y fuga de la credencial.
  */
 async function obtenerBytes(
   src: AdjuntoAudio,
@@ -146,7 +152,9 @@ async function obtenerBytes(
     const autenticada = esRutaMediaZernio(src.url);
     // La URL de un adjunto entrante de WhatsApp ES el endpoint autenticado:
     // sin credencial no tiene sentido intentarla.
-    if (!autenticada || key) {
+    // Este bot recibe WhatsApp vía Zernio. Nunca descargar URLs arbitrarias ni
+    // enviar la credencial a un dominio que solo imite el path de media.
+    if (autenticada && key) {
       candidatas.push({
         url: src.url,
         headers: autenticada && key ? { Authorization: `Bearer ${key}` } : {},
@@ -173,12 +181,32 @@ async function descargar(
   timeoutMs: number
 ): Promise<Bytes | null> {
   try {
-    const res = await fetch(url, { headers, signal: AbortSignal.timeout(timeoutMs) });
+    if (!esRutaMediaZernio(url)) return null;
+    const res = await fetch(url, { headers, redirect: "error", signal: AbortSignal.timeout(timeoutMs) });
     if (!res.ok) {
       console.error("[transcribe] descarga del audio falló:", res.status, urlMediaEtiqueta(url));
       return null;
     }
-    const buffer = await res.arrayBuffer();
+    const maxBytes = 25 * 1024 * 1024;
+    if (Number(res.headers.get("content-length")) > maxBytes) {
+      await res.body?.cancel();
+      return null;
+    }
+    if (!res.body) return null;
+    const reader = res.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) { await reader.cancel(); return null; }
+      chunks.push(value);
+    }
+    const joined = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) { joined.set(chunk, offset); offset += chunk.byteLength; }
+    const buffer = joined.buffer;
     if (!buffer.byteLength) {
       console.error("[transcribe] la descarga devolvió 0 bytes:", urlMediaEtiqueta(url));
       return null;
