@@ -26,8 +26,10 @@ export async function processIncomingTurn(
     if (!(await dependencies.leads.isLatestInboundMessage(turn.leadId, turn.messageId))) {
       return { messages: [], escalate: false, ignored: "obsolete_message" };
     }
+    const currentLead = await dependencies.leads.get(turn.leadId);
+    if (currentLead.bot_activo === false) return { messages: [], escalate: false, ignored: "bot_inactive" };
     const engine = new ConversationEngine(dependencies.leads, new AgendaService(dependencies.appointments));
-    const result = await engine.handle(lead, analysis, now);
+    const result = await engine.handle(currentLead, analysis, now);
     await dependencies.leads.update(turn.leadId, { ultimo_mensaje_procesado: turn.messageId });
     return result;
   } catch (error) {
