@@ -123,11 +123,21 @@ test("guard de mensajes usa igualdad de conversaciones y rechaza mensajes viejos
   assert.equal(await repo.isLatestInboundMessage("l1", "new"), true);
 });
 
-test("necesita_asesor impide activar el nuevo motor aunque bot_activo siga true", async () => {
+test("necesita_asesor NO apaga el bot: sigue activo mientras bot_activo siga true", async () => {
   const sdk = new PocketBase("http://example.invalid");
   const pb = { filter: sdk.filter.bind(sdk), collection: () => ({
     getOne: async () => ({ id: "l1" }),
     getFullList: async () => [{ bot_activo: true, necesita_asesor: true }],
+  }) };
+  // necesita_asesor es solo un aviso al asesor; el bot sigue contestando.
+  assert.equal((await new PocketBaseLeadRepository(pb as never).get("l1")).bot_activo, true);
+});
+
+test("el bot se apaga SOLO cuando bot_activo=false (asesor lo tomó/contestó)", async () => {
+  const sdk = new PocketBase("http://example.invalid");
+  const pb = { filter: sdk.filter.bind(sdk), collection: () => ({
+    getOne: async () => ({ id: "l1" }),
+    getFullList: async () => [{ bot_activo: false, necesita_asesor: true }],
   }) };
   assert.equal((await new PocketBaseLeadRepository(pb as never).get("l1")).bot_activo, false);
 });

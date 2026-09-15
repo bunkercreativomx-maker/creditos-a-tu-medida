@@ -145,9 +145,11 @@ export class PocketBaseLeadRepository implements LeadRepository {
     const lead = await this.pb.collection("leads").getOne(id) as Record<string, unknown>;
     const data = toLeadData(lead);
     // bot_activo vive en conversations (una por lead). La inyectamos en el modelo lógico.
+    // OJO: necesita_asesor NO apaga el bot — es solo un aviso al asesor. El bot se apaga
+    // únicamente cuando el asesor lo toma/contesta (eso pone conversations.bot_activo=false).
     const convs = await this.pb.collection("conversations")
       .getFullList({ filter: this.pb.filter("lead = {:lead}", { lead: id }) });
-    data.bot_activo = convs.length > 0 && convs.every((c) => c.bot_activo === true && c.necesita_asesor !== true);
+    data.bot_activo = convs.length === 0 ? true : convs.some((c) => c.bot_activo === true);
     return data;
   }
 
