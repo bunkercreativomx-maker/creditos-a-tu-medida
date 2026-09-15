@@ -54,7 +54,7 @@ export async function runNewEngineTurn(args: {
   // Enviar por Zernio, en orden, y persistir cada respuesta del bot.
   for (const content of result.messages) {
     const conversation = await pb.collection("conversations").getOne(args.conversationId);
-    if (conversation.bot_activo === false || conversation.necesita_asesor === true ||
+    if (conversation.bot_activo === false ||
         !(await leads.isLatestInboundMessage(args.leadId, args.messageId))) return true;
     await sendWhatsAppMessage(args.conversationZernioId, args.accountId, content);
     await pb.collection("messages").create({

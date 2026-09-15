@@ -9,8 +9,8 @@ export function greeting(lang: Lang, now = new Date()): string {
   const hour = Number(localNow(now).time.slice(0, 2));
   const hello = hour < 12 ? "¡Buenos días!" : hour < 19 ? "¡Buenas tardes!" : "¡Buenas noches!";
   return lang === "en"
-    ? `Hello! This is ${BUSINESS_NAME}. I'd be happy to help. May I have your full name, please?`
-    : `${hello} Le atendemos en ${BUSINESS_NAME}. Con gusto le ayudo. ¿Me comparte su nombre completo, por favor?`;
+    ? `Hello! This is ${BUSINESS_NAME}. I'd be happy to help. May I have the full name of the person applying for the loan, please?`
+    : `${hello} Le atendemos en ${BUSINESS_NAME}. Con gusto le ayudo. ¿Me comparte el nombre completo de la persona que solicita el crédito, por favor?`;
 }
 
 export function nextQuestion(lead: LeadData, lang: Lang, patch: Partial<LeadData> = {}, now = new Date()): string | null {

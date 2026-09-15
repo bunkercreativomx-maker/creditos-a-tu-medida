@@ -36,13 +36,13 @@ function scenario(initial: Partial<LeadData> = {}) {
     async delete(id) { appointments.splice(appointments.findIndex((a) => a.id === id), 1); },
   };
   const engine = new ConversationEngine(leads, new AgendaService(repo));
-  return { leads, appointments, turn: (a) => engine.handle(lead, a, now) };
+  return { leads, appointments, turn: (a, request = {}) => engine.handle(lead, a, now, request) };
 }
 
-test("conversación reportada: pregunta nombre y crédito, propone y confirma una sola vez", async () => {
+test("conversación reportada: pide el nombre del solicitante, pregunta crédito y confirma una sola vez", async () => {
   const s = scenario();
   let r = await s.turn(analysis({}, { intent: "saludo" }));
-  assert.match(r.messages[0], /Buenas tardes.*Créditos a tu medida.*nombre completo/);
+  assert.match(r.messages[0], /Buenas tardes.*Créditos a tu medida.*nombre completo de la persona que solicita el crédito/);
   assert.doesNotMatch(r.messages[0], /Pako|pensionado/);
   r = await s.turn(analysis({ nombre: "Francisco López" }));
   assert.match(r.messages[0], /Mucho gusto, Francisco.*jubilado o pensionado/);
@@ -123,13 +123,62 @@ test("guard de mensajes usa igualdad de conversaciones y rechaza mensajes viejos
   assert.equal(await repo.isLatestInboundMessage("l1", "new"), true);
 });
 
-test("necesita_asesor impide activar el nuevo motor aunque bot_activo siga true", async () => {
+test("necesita_asesor mantiene el bot disponible hasta que un asesor tome el control", async () => {
   const sdk = new PocketBase("http://example.invalid");
   const pb = { filter: sdk.filter.bind(sdk), collection: () => ({
     getOne: async () => ({ id: "l1" }),
     getFullList: async () => [{ bot_activo: true, necesita_asesor: true }],
   }) };
-  assert.equal((await new PocketBaseLeadRepository(pb as never).get("l1")).bot_activo, false);
+  const lead = await new PocketBaseLeadRepository(pb as never).get("l1");
+  assert.equal(lead.bot_activo, true);
+  assert.equal(lead.necesita_asesor, true);
+});
+
+test("tras escalar, dirección y cita siguen atendidas aunque falten datos de precalificación", async () => {
+  const s = scenario({
+    estatus: "pensionado",
+    dependencia: "IMSS",
+    monto_solicitado: null,
+    credito_vigente: null,
+    necesita_asesor: true,
+  });
+  const r = await s.turn(
+    analysis({}, { intent: "pedir_direccion" }),
+    { pideDireccion: true, pideCita: true },
+  );
+  assert.match(r.messages[0], /Benjamín Franklin 3220/);
+  assert.match(r.messages[0], /Qué día y hora le acomodan/);
+  assert.doesNotMatch(r.messages[0], /cantidad le gustaría solicitar/);
+});
+
+test("ráfaga de WhatsApp conserva la petición de cita del mensaje anterior", async (t) => {
+  const saved = { key: process.env.OPENAI_API_KEY, model: process.env.OPENAI_MODEL };
+  process.env.OPENAI_API_KEY = "test-not-a-real-key";
+  process.env.OPENAI_MODEL = "test";
+  t.after(() => {
+    if (saved.key === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = saved.key;
+    if (saved.model === undefined) delete process.env.OPENAI_MODEL; else process.env.OPENAI_MODEL = saved.model;
+  });
+  const mock = makeMockPb({
+    leads: [{ id: "l1", nombre: "Pako", nombre_confirmado: true }],
+    conversations: [{ id: "c1", bot_activo: true, necesita_asesor: true }],
+    messages: [
+      { id: "b1", conversation: "c1", remitente: "bot", contenido: "Un asesor le responde por aquí.", created: "2026-09-15T22:48:00Z" },
+      { id: "m1", conversation: "c1", remitente: "cliente", contenido: "Dónde los puedo ver, quisiera una cita", created: "2026-09-15T22:49:00Z" },
+      { id: "m2", conversation: "c1", remitente: "cliente", contenido: "Me pasa su dirección", created: "2026-09-15T22:49:01Z" },
+    ],
+  });
+  let received = "";
+  await procesarTurnoBot({
+    leadId: "l1", conversationId: "c1", mensajeId: "m2", telefono: "6560000000", esLeadNuevo: false,
+    parsed: { text: "Me pasa su dirección", nombre: "Pako", telefono: "6560000000", conversationId: "zc1", accountId: "za1", attachments: [] },
+  }, {
+    pb: mock.pb, send: async () => {}, runBotTurn: async () => ({ reply: null, escalate: false, leadData: null, cita: null }),
+    runNewEngineTurn: async (args) => { received = args.text; return true; },
+    notifyNeedsAdvisor: async () => {}, notifyNewLead: async () => {}, notifyNewLeadToSlack: async () => {},
+  });
+  assert.match(received, /quisiera una cita/);
+  assert.match(received, /Me pasa su dirección/);
 });
 
 for (const fail of [false, true]) {

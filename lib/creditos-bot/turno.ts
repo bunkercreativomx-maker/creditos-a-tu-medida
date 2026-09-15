@@ -2,6 +2,8 @@ import { AgendaService } from "./agenda";
 import { ConversationEngine } from "./engine";
 import { analyzeIncomingMessage } from "./openai-intent";
 import { localNow } from "./time";
+import { pideAgendar } from "@/lib/agenda";
+import { pideUbicacion } from "@/lib/intenciones";
 import type { AppointmentRepository, IncomingTurn, LeadRepository, TurnResult } from "./types";
 
 export async function processIncomingTurn(
@@ -29,7 +31,10 @@ export async function processIncomingTurn(
     const currentLead = await dependencies.leads.get(turn.leadId);
     if (currentLead.bot_activo === false) return { messages: [], escalate: false, ignored: "bot_inactive" };
     const engine = new ConversationEngine(dependencies.leads, new AgendaService(dependencies.appointments));
-    const result = await engine.handle(currentLead, analysis, now);
+    const result = await engine.handle(currentLead, analysis, now, {
+      pideCita: pideAgendar(turn.text),
+      pideDireccion: pideUbicacion(turn.text),
+    });
     await dependencies.leads.update(turn.leadId, { ultimo_mensaje_procesado: turn.messageId });
     return result;
   } catch (error) {
