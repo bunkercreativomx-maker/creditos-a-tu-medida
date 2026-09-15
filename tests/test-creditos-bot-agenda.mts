@@ -1,12 +1,10 @@
 // Tests del núcleo determinista del motor OpenAI (lib/creditos-bot).
-// Porto los tests incluidos en el paquete creditos-openai-replacement al runner
-// nativo del proyecto (node --test), igual que el resto de tests/.
-//
+// REGLA DE NEGOCIO: hasta 4 asesores => un mismo horario admite HASTA 4 citas.
 // Ejecutar: node --import ./tests/loader.mjs --test tests/test-creditos-bot-agenda.mts
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { AgendaService, slotKey } from "@/lib/creditos-bot/agenda.ts";
+import { AgendaService, slotKey, MAX_CITAS_POR_SLOT } from "@/lib/creditos-bot/agenda.ts";
 import type { AppointmentRecord, AppointmentRepository, LeadData } from "@/lib/creditos-bot/types.ts";
 import { localDateTimeToUtc, utcToLocalParts } from "@/lib/creditos-bot/time.ts";
 
@@ -26,7 +24,6 @@ class FakeAppointments implements AppointmentRepository {
   }
   async create(input: Omit<AppointmentRecord, "id">) {
     await Promise.resolve();
-    if (this.rows.some((r) => r.slot_key === input.slot_key)) throw new Error("UNIQUE slot_key");
     const row = { id: `a${++this.sequence}`, ...input };
     this.rows.push(row);
     return row;
@@ -34,7 +31,6 @@ class FakeAppointments implements AppointmentRepository {
   async update(id: string, input: Partial<Omit<AppointmentRecord, "id" | "lead">>) {
     const row = this.rows.find((r) => r.id === id);
     if (!row) throw new Error("not found");
-    if (input.slot_key && this.rows.some((r) => r.id !== id && r.slot_key === input.slot_key)) throw new Error("UNIQUE slot_key");
     Object.assign(row, input);
     return row;
   }
@@ -66,10 +62,13 @@ test("una cita de 17:00 en invierno puede caer al día UTC siguiente", () => {
   assert.deepEqual(utcToLocalParts(utc), { date: "2026-01-15", time: "17:00" });
 });
 
-test("no agenda domingo y respeta sábado", async () => {
+test("no agenda domingo; oddices válidos entre semana (incl 14:00) y sábado", async () => {
   const service = new AgendaService(new FakeAppointments());
   assert.equal((await service.validateSlot("2026-09-20", "10:00", now)).reason, "domingo_requiere_asesor");
-  assert.equal((await service.validateSlot("2026-09-19", "10:00", now)).ok, true);
+  assert.equal((await service.validateSlot("2026-09-19", "10:00", now)).ok, true); // sábado
+  // 14:00 ahora es un slot válido entre semana (cliente pide "a las 2")
+  assert.equal((await service.validateSlot("2026-09-21", "14:00", now)).ok, true);
+  // sábado a las 14:00 no es válido (sáb hasta 13:00)
   assert.equal((await service.validateSlot("2026-09-19", "14:00", now)).reason, "fuera_de_horario");
 });
 
@@ -77,26 +76,44 @@ test("rechaza hora faltante, pasada y fuera de jornada", async () => {
   const service = new AgendaService(new FakeAppointments());
   assert.equal((await service.validateSlot("2026-09-21", "", now)).reason, "hora_invalida");
   assert.equal((await service.validateSlot("2026-09-15", "10:00", now)).reason, "horario_pasado");
-  assert.equal((await service.validateSlot("2026-09-21", "14:00", now)).reason, "fuera_de_horario");
+  // 18:00 está fuera de jornada (última cita 17:00)
+  assert.equal((await service.validateSlot("2026-09-21", "18:00", now)).reason, "fuera_de_horario");
 });
 
-test("cita ocupada no crea y consultar luego refleja ocupación", async () => {
+test("un mismo slot admite HASTA 4 citas (4 asesores)", async () => {
   const repo = new FakeAppointments();
   const service = new AgendaService(repo);
-  assert.equal((await service.bookOrReschedule(lead("l1"), "2026-09-21", "10:00", now)).ok, true);
-  assert.equal((await service.bookOrReschedule(lead("l2"), "2026-09-21", "10:00", now)).ok, false);
+  for (let i = 0; i < MAX_CITAS_POR_SLOT; i++) {
+    assert.equal((await service.bookOrReschedule(lead(`l${i}`), "2026-09-21", "10:00", now)).ok, true, `intento ${i + 1} debe pasar`);
+  }
+  assert.ok((await service.availableSlots("2026-09-21", now)).includes("10:00") === false);
+  // slot sigue apareciendo? con 4 citas ya no debe ofrecerse de nuevo
   assert.ok(!(await service.availableSlots("2026-09-21", now)).includes("10:00"));
 });
 
-test("dos clientes simultáneos solo consiguen un mismo slot", async () => {
+test("cuatro citas llenan el slot; el quinto lo rechaza y ofrece alternativas", async () => {
+  const repo = new FakeAppointments();
+  const service = new AgendaService(repo);
+  for (let i = 0; i < MAX_CITAS_POR_SLOT; i++) {
+    await service.bookOrReschedule(lead(`l${i}`), "2026-09-21", "11:00", now);
+  }
+  const fifth = await service.bookOrReschedule(lead("l9"), "2026-09-21", "11:00", now);
+  assert.equal(fifth.ok, false);
+  if (!fifth.ok) {
+    assert.equal(fifth.reason, "horario_ocupado");
+    assert.ok(fifth.alternatives.length > 0, "debe ofrecer alternativas");
+  }
+});
+
+test("dos clientes simultáneos al mismo slot: ambos caben (cupo 4)", async () => {
   const repo = new FakeAppointments();
   const service = new AgendaService(repo);
   const results = await Promise.all([
     service.bookOrReschedule(lead("l1"), "2026-09-21", "11:00", now),
     service.bookOrReschedule(lead("l2"), "2026-09-21", "11:00", now),
   ]);
-  assert.equal(results.filter((r) => r.ok).length, 1);
-  assert.equal(repo.rows.filter((r) => r.slot_key === slotKey("2026-09-21", "11:00")).length, 1);
+  assert.equal(results.filter((r) => r.ok).length, 2);
+  assert.equal(repo.rows.filter((r) => r.slot_key === slotKey("2026-09-21", "11:00")).length, 2);
 });
 
 test("reagenda la cita futura correcta y no toca la histórica", async () => {

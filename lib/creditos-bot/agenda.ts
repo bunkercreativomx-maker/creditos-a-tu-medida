@@ -20,6 +20,12 @@ export function slotKey(localDate: string, localTime: string): string {
   return `${localDate}|${localTime}`;
 }
 
+/**
+ * Hasta 4 asesores atienden en paralelo => un mismo horario admite HASTA 4 citas.
+ * Un slot se considera LLENO (no disponible) solo cuando ya tiene 4 citas.
+ */
+export const MAX_CITAS_POR_SLOT = 4;
+
 export class AgendaService {
   private readonly repo: AppointmentRepository;
 
@@ -27,12 +33,28 @@ export class AgendaService {
     this.repo = repo;
   }
 
+  /** Número de citas ya tomadas por slot_key (excluye excludeId si se da). */
+  private async countsForDay(localDate: string, excludeId?: string): Promise<Map<string, number>> {
+    const appointments = await this.repo.listForLocalDay(localDate);
+    const counts = new Map<string, number>();
+    for (const a of appointments) {
+      if (excludeId && a.id === excludeId) continue;
+      // a.slot_key ya viene en hora local (YYYY-MM-DD|HH:MM); contamos ese slot.
+      const key = a.slot_key || slotKey(localDate, a.fecha?.slice(11, 16) ?? "");
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return counts;
+  }
+
   async availableSlots(localDate: string, now = new Date(), excludeId?: string): Promise<string[]> {
     const slots = [...slotsForLocalDate(localDate)];
     if (slots.length === 0) return [];
-    const appointments = await this.repo.listForLocalDay(localDate);
-    const occupied = new Set(appointments.filter((a) => a.id !== excludeId).map((a) => a.slot_key));
-    return slots.filter((time) => !isPastLocalSlot(localDate, time, now) && !occupied.has(slotKey(localDate, time)));
+    const counts = await this.countsForDay(localDate, excludeId);
+    return slots.filter((time) => {
+      if (isPastLocalSlot(localDate, time, now)) return false;
+      const key = slotKey(localDate, time);
+      return (counts.get(key) ?? 0) < MAX_CITAS_POR_SLOT;
+    });
   }
 
   async validateSlot(localDate: string, localTime: string, now = new Date(), excludeId?: string): Promise<SlotValidation> {
@@ -97,7 +119,8 @@ export class AgendaService {
         : await this.repo.create({ lead: lead.id, ...input });
       return { ok: true, appointment };
     } catch {
-      // Una restricción UNIQUE sobre slot_key es la defensa final contra carreras.
+      // Carrera de última milésima: ya no depende de UNIQUE por slot (hasta 4 citas),
+      // pero si la DB rechaza (p.ej. slide de slot llegó a 4), ofrecemos alternativas.
       const alternatives = await this.availableSlots(localDate, now, current?.id);
       return { ok: false, reason: "error_base_datos", alternatives: alternatives.slice(0, 2) };
     }

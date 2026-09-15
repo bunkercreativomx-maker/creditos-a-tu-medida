@@ -7,7 +7,8 @@ export const ELIGIBLE_DEPENDENCIES = ["IMSS", "ISSSTE", "CFE", "SNTE", "PEMEX"] 
 
 // Citas de 30 minutos, con un inicio cada hora según la decisión del negocio.
 export const APPOINTMENT_DURATION_MINUTES = 30;
-export const WEEKDAY_SLOTS = ["09:00", "10:00", "11:00", "12:00", "13:00", "15:00", "16:00", "17:00"] as const;
+// 14:00 es reservable (los clientes piden "a las 2"). Hasta 4 asesores => 4 citas/slot.
+export const WEEKDAY_SLOTS = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00"] as const;
 export const SATURDAY_SLOTS = ["09:00", "10:00", "11:00", "12:00", "13:00"] as const;
 export const SUNDAY_SLOTS: readonly string[] = [];
 

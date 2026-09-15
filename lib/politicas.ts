@@ -25,8 +25,9 @@ export const HORARIO_ATENCION_TEXTO =
 export const ULTIMA_CITA_HHMM = "17:00";
 
 /** Slots reservables por día (los que el motor de citas realmente agenda). */
+// 14:00 es reservable (los clientes piden "a las 2"). Hasta 4 asesores => 4 citas/slot.
 export const HORARIOS_LUN_VIE = [
-  "09:00", "10:00", "11:00", "12:00", "13:00", "15:00", "16:00", "17:00",
+  "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00",
 ];
 export const HORARIOS_SABADO = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00"];
 export const HORARIOS_DOMINGO = ["10:00", "11:00", "12:00", "13:00", "14:00"];
