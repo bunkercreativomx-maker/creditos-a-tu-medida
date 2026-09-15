@@ -16,6 +16,8 @@ export interface LeadData {
   empresa_credito?: string | null;
   antiguedad_credito?: string | null;
   bot_activo?: boolean;
+  /** Hay una consulta pendiente para el equipo, pero el bot aún puede atender logística. */
+  necesita_asesor?: boolean;
   cita_propuesta_fecha?: string | null;
   cita_propuesta_hora?: string | null;
   ultimo_mensaje_procesado?: string | null;

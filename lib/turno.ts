@@ -344,6 +344,20 @@ export async function procesarTurnoBot(
         return { role, content };
       });
 
+    // WhatsApp suele entregar frases cortas en ráfaga. El guard deja que solo
+    // responda el mensaje más reciente, pero ese turno debe entender también
+    // los mensajes consecutivos del cliente desde la última respuesta del bot.
+    // Así "quiero una cita" + "pásame la dirección" no pierde la cita.
+    const textoTurno = latestItems
+      .slice(0, latestItems.findIndex((m) => m.remitente !== "cliente") < 0
+        ? latestItems.length
+        : latestItems.findIndex((m) => m.remitente !== "cliente"))
+      .slice()
+      .reverse()
+      .map((m) => String(m.contenido ?? "").trim())
+      .filter(Boolean)
+      .join("\n") || textoHoy;
+
     // Comparte la transcripción y el historial con el motor nuevo antes de los
     // manejadores viejos. Una falla nunca vuelve a ejecutar efectos en otro motor.
     if (process.env.OPENAI_API_KEY && process.env.OPENAI_MODEL) {
@@ -354,7 +368,7 @@ export async function procesarTurnoBot(
           conversationZernioId: pbConversationId ?? conversationId,
           accountId: pbAccountId ?? "",
           messageId: mensajeId ?? "",
-          text: textoHoy,
+          text: textoTurno,
           history: history.slice(0, -1),
         });
         // Lead nuevo de WhatsApp: avisar al asesor (pipeline + push + Slack),
@@ -385,7 +399,7 @@ export async function procesarTurnoBot(
 
     // MANEJADOR 0 — PETICIÓN COMPUESTA: pedir asesor Y la dirección se atiende
     // completa (no se pierde la solicitud humana).
-    if (esPreguntaDeAsesor(textoHoy) && pideUbicacion(textoHoy)) {
+    if (esPreguntaDeAsesor(textoTurno) && pideUbicacion(textoTurno)) {
       const msg = esPrimerTurno
         ? `¡Hola! Buen día 👋 Le saluda Créditos a tu medida. Estamos en ${DIR_OFICIAL}. Y con gusto, esa información se la da directamente un asesor para que sea exacta; permítame comunicarlo, en un momento le responden por aquí.`
         : `Con gusto${corto0 ? `, ${corto0}` : ""}. Estamos en ${DIR_OFICIAL}. Y esa información se la da directamente un asesor para que sea exacta; permítame comunicarlo, en un momento le responden por aquí.`;
@@ -396,7 +410,7 @@ export async function procesarTurnoBot(
     }
 
     // MANEJADOR 0 — PREGUNTA QUE SOLO UN ASESOR PUEDE CONTESTAR (BLOQUE 8).
-    if (esPreguntaDeAsesor(textoHoy)) {
+    if (esPreguntaDeAsesor(textoTurno)) {
       const msg = esPrimerTurno
         ? "¡Hola! Buen día 👋 Le saluda Créditos a tu medida. Con gusto, esa información se la da directamente un asesor para que sea exacta. Permítame comunicarlo, en un momento le responden por aquí."
         : `Con gusto${corto0 ? `, ${corto0}` : ""}. Esa información se la da directamente un asesor para que sea exacta. Permítame comunicarlo, en un momento le responden por aquí.`;
@@ -408,8 +422,8 @@ export async function procesarTurnoBot(
 
     // MANEJADOR 0A — CANCELAR / CAMBIAR cita (antes que "pregunta por su cita",
     // que antes se tragaba "mi cita" y confirmaba la cita vieja).
-    const quiereCancelar = pideCancelarCita(textoHoy);
-    const quiereReagendar = pideReagendar(textoHoy);
+    const quiereCancelar = pideCancelarCita(textoTurno);
+    const quiereReagendar = pideReagendar(textoTurno);
     if (quiereCancelar || quiereReagendar) {
       const susCitas = (await pb
         .collection("citas")
@@ -429,7 +443,7 @@ export async function procesarTurnoBot(
       }
       // quiereReagendar: intenta la vía determinista (actualiza la cita existente).
       const respAgenda = await intentarAgendarDeterminista(
-        textoHoy,
+        textoTurno,
         nombreLead,
         leadActual,
         corto0,
@@ -448,7 +462,7 @@ export async function procesarTurnoBot(
     }
 
     // MANEJADOR 0B — el cliente pregunta por SU cita (día, hora, si sigue en pie).
-    if (preguntaPorSuCita(textoHoy)) {
+    if (preguntaPorSuCita(textoTurno)) {
       const susCitas = (await pb
         .collection("citas")
         .getFullList({ filter: `lead = "${leadId}"` })
@@ -477,7 +491,7 @@ export async function procesarTurnoBot(
     }
 
     // MANEJADOR: el cliente pregunta por la ubicación/dirección → responde directo.
-    if (pideUbicacion(textoHoy)) {
+    if (pideUbicacion(textoTurno)) {
       const msg = `Claro${corto0 ? `, ${corto0}` : ""}. Estamos en ${DIR_OFICIAL}. Le esperamos. ¿Le ayudo a agendar su cita?`;
       await responder(msg);
       return;
@@ -513,7 +527,7 @@ export async function procesarTurnoBot(
       const saludo =
         esRecurrente && nombreCliente
           ? `¡Hola de nuevo, ${nombreCliente}! 👋 Le saluda Créditos a tu medida. Qué gusto que se comunique otra vez. Ya tengo sus datos registrados, así que podemos ir directo. ¿En qué le puedo ayudar hoy?`
-          : "¡Hola! Buen día 👋 Le saluda Créditos a tu medida. Con gusto le ayudo con su información de préstamo. ¿Me regala su nombre completo, por favor?";
+          : "¡Hola! Buen día 👋 Le saluda Créditos a tu medida. Con gusto le ayudo con su información de préstamo. ¿Me regala el nombre completo de la persona que solicita el crédito, por favor?";
       await responder(saludo);
       if (esLeadNuevo) {
         await notifyNewLeadToSlack({
@@ -638,7 +652,7 @@ export async function procesarTurnoBot(
     const resultWithError = botResult as BotTurnResultWithError;
     const botFallo = resultWithError.botError || !botResult.reply || !botResult.reply.trim();
 
-    const textoCliente = textoHoy;
+    const textoCliente = textoTurno;
 
     try {
       if (botFallo) {

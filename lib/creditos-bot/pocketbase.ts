@@ -41,8 +41,9 @@ function toLeadData(record: Record<string, unknown>): LeadData {
     cita_propuesta_fecha: record.cita_propuesta_fecha == null ? null : String(record.cita_propuesta_fecha),
     cita_propuesta_hora: record.cita_propuesta_hora == null ? null : String(record.cita_propuesta_hora),
     ultimo_mensaje_procesado: record.ultimo_mensaje_procesado == null ? null : String(record.ultimo_mensaje_procesado),
-    // bot_activo NO vive en leads: se inyecta por el repositorio desde conversations.
+    // bot_activo/necesita_asesor NO viven en leads: los inyecta el repositorio.
     bot_activo: record.bot_activo as boolean | undefined,
+    necesita_asesor: record.necesita_asesor as boolean | undefined,
   };
 }
 
@@ -144,10 +145,12 @@ export class PocketBaseLeadRepository implements LeadRepository {
   async get(id: string): Promise<LeadData> {
     const lead = await this.pb.collection("leads").getOne(id) as Record<string, unknown>;
     const data = toLeadData(lead);
-    // bot_activo vive en conversations (una por lead). La inyectamos en el modelo lógico.
+    // Una derivación pendiente no apaga al bot. Solo `bot_activo=false`, que se
+    // establece cuando un asesor toma la conversación, detiene las respuestas.
     const convs = await this.pb.collection("conversations")
       .getFullList({ filter: this.pb.filter("lead = {:lead}", { lead: id }) });
-    data.bot_activo = convs.length > 0 && convs.every((c) => c.bot_activo === true && c.necesita_asesor !== true);
+    data.bot_activo = convs.length > 0 && convs.every((c) => c.bot_activo === true);
+    data.necesita_asesor = convs.some((c) => c.necesita_asesor === true);
     return data;
   }
 

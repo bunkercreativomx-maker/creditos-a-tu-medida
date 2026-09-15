@@ -264,7 +264,7 @@ test("saludo del primer contacto es fijo (no pasa por LLM)", async () => {
 
   assert.equal(llamoLLM, false, "el saludo no pasa por el LLM");
   assert.match(sent.join("\n"), /Créditos a tu medida/);
-  assert.match(sent.join("\n"), /nombre completo/);
+  assert.match(sent.join("\n"), /nombre completo de la persona que solicita el crédito/);
 });
 
 test("cliente recurrente en sesión nueva → lo saluda por su nombre", async () => {
