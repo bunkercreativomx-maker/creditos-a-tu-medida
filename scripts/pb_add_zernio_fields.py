@@ -1,7 +1,8 @@
+import os
 import json, urllib.request, sys
 from urllib.error import HTTPError
 
-PBPASS = "2wJEAhdqexRy1K7beBhq"
+PBPASS = os.environ.get("PB_ADMIN_PASSWORD", "")
 base = "https://creditos-pb.bunkeragent.cloud"
 
 def call(path, method="GET", token=None, body=None):

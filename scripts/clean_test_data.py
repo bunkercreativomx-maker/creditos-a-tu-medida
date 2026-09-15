@@ -1,7 +1,8 @@
+import os
 import urllib.request, json
 from urllib.error import HTTPError
 
-PBPASS = "2wJEAhdqexRy1K7beBhq"
+PBPASS = os.environ.get("PB_ADMIN_PASSWORD", "")
 base = "https://creditos-pb.bunkeragent.cloud"
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36"
 
