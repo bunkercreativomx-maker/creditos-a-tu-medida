@@ -31,6 +31,7 @@ function toLeadData(record: Record<string, unknown>): LeadData {
     id: String(record.id),
     telefono: record.telefono == null ? null : String(record.telefono),
     nombre: record.nombre == null ? null : String(record.nombre),
+    nombre_confirmado: record.nombre_confirmado === true,
     estatus: (record.sector as LeadData["estatus"]) ?? null,
     dependencia: institutionToDependency(record.institucion),
     monto_solicitado: record.monto_aproximado == null ? null : String(record.monto_aproximado),
@@ -50,14 +51,15 @@ function institutionToDependency(v: unknown): LeadData["dependencia"] {
   const s = v == null ? "" : String(v).trim().toUpperCase();
   const dep: LeadData["dependencia"] = ["IMSS", "ISSSTE", "CFE", "SNTE", "PEMEX"].includes(s) ? s as LeadData["dependencia"] : null;
   // "otra"/texto libre de institución -> "otra" (dependencia no elegible) pero se preserva.
-  return dep ?? (s && s !== "OTRA" ? "otra" : null);
+  return dep ?? (s ? "otra" : null);
 }
 
 /** `otra_financiera` real ("si"/"no" o texto) -> credito_vigente lógico. */
 function otraFinancieraToSiNo(v: unknown): LeadData["credito_vigente"] {
   const s = v == null ? "" : String(v).trim().toLowerCase();
   if (s === "si" || s === "yes" || s === "sí" || s === "1") return "si";
-  if (s === "no" || s === "0" || s === "") return "no";
+  if (s === "") return null;
+  if (s === "no" || s === "0") return "no";
   // Un texto (nombre de empresa) implica que SÍ hay crédito vigente.
   return "si";
 }
@@ -66,6 +68,7 @@ function otraFinancieraToSiNo(v: unknown): LeadData["credito_vigente"] {
 function fromLeadPatch(input: Partial<LeadData>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   if (input.nombre !== undefined) out.nombre = input.nombre;
+  if (input.nombre_confirmado !== undefined) out.nombre_confirmado = input.nombre_confirmado;
   if (input.telefono !== undefined) out.telefono = input.telefono;
   if (input.estatus !== undefined) out.sector = input.estatus;
   if (input.dependencia !== undefined) out.institucion = input.dependencia;
@@ -143,16 +146,17 @@ export class PocketBaseLeadRepository implements LeadRepository {
     const data = toLeadData(lead);
     // bot_activo vive en conversations (una por lead). La inyectamos en el modelo lógico.
     const convs = await this.pb.collection("conversations")
-      .getFullList({ filter: this.pb.filter("lead = {:lead}", { lead: id }) })
-      .catch(() => [] as unknown as { bot_activo?: boolean }[]);
-    const activo = (convs as { bot_activo?: boolean }[]).some((c) => c.bot_activo === true);
-    data.bot_activo = (convs as { bot_activo?: boolean }[]).length > 0 ? activo : true;
+      .getFullList({ filter: this.pb.filter("lead = {:lead}", { lead: id }) });
+    data.bot_activo = convs.length > 0 && convs.every((c) => c.bot_activo === true && c.necesita_asesor !== true);
     return data;
   }
 
   async update(id: string, input: Partial<LeadData>): Promise<LeadData> {
     const payload = fromLeadPatch(input);
     const updated = await this.pb.collection("leads").update(id, payload) as Record<string, unknown>;
+    if (input.nombre_confirmado === true && updated.nombre_confirmado !== true) {
+      throw new Error("Falta migrar leads.nombre_confirmado; no se pudo guardar la confirmación del nombre");
+    }
     return toLeadData(updated);
   }
 
@@ -160,16 +164,13 @@ export class PocketBaseLeadRepository implements LeadRepository {
     // La colección real es `messages`, keyed por `conversation` (no por lead).
     // Buscamos las conversaciones del lead y luego la más reciente con remitente cliente.
     const convs = await this.pb.collection("conversations")
-      .getFullList({ filter: this.pb.filter("lead = {:lead}", { lead: leadId }) })
-      .catch(() => [] as unknown as { id?: string }[]);
+      .getFullList({ filter: this.pb.filter("lead = {:lead}", { lead: leadId }) });
     const ids = (convs as { id?: string }[]).filter((c) => c.id).map((c) => c.id as string);
-    if (ids.length === 0) return true; // sin conversación, no hay mensajes que disputen
-    const filter = this.pb.filter(
-      "conversation ~ {:ids} && remitente = 'cliente'",
-      { ids: JSON.stringify(ids) }
-    );
+    if (ids.length === 0 || !messageId) return false;
+    const conversationFilter = ids.map((id) => this.pb.filter("conversation = {:id}", { id })).join(" || ");
+    const filter = `(${conversationFilter}) && remitente = 'cliente'`;
     const page = await this.pb.collection("messages").getList(1, 1, { filter, sort: "-created" });
     const latest = page.items[0] as { id?: string } | undefined;
-    return !latest?.id || latest.id === messageId;
+    return latest?.id === messageId;
   }
 }
