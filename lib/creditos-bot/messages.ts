@@ -1,37 +1,47 @@
 import { ADDRESS, BUSINESS_NAME } from "./policy";
 import type { LeadData } from "./types";
+import { formatLocalAppointment, localDateTimeToUtc, localNow } from "./time";
 
 type Lang = "es" | "en";
-const firstName = (lead: LeadData) => lead.nombre?.trim().split(/\s+/)[0] || "";
+const firstName = (lead: LeadData) => lead.nombre_confirmado ? lead.nombre?.trim().split(/\s+/)[0] || "" : "";
 
-export function greeting(lang: Lang): string {
+export function greeting(lang: Lang, now = new Date()): string {
+  const hour = Number(localNow(now).time.slice(0, 2));
+  const hello = hour < 12 ? "¡Buenos días!" : hour < 19 ? "¡Buenas tardes!" : "¡Buenas noches!";
   return lang === "en"
-    ? `Hello! Good day 👋 This is ${BUSINESS_NAME}. May I have your full name, please?`
-    : `¡Hola! Buen día 👋 Le saluda ${BUSINESS_NAME}. ¿Me regala su nombre completo, por favor?`;
+    ? `Hello! This is ${BUSINESS_NAME}. I'd be happy to help. May I have your full name, please?`
+    : `${hello} Le atendemos en ${BUSINESS_NAME}. Con gusto le ayudo. ¿Me comparte su nombre completo, por favor?`;
 }
 
-export function nextQuestion(lead: LeadData, lang: Lang): string | null {
+export function nextQuestion(lead: LeadData, lang: Lang, patch: Partial<LeadData> = {}, now = new Date()): string | null {
   const name = firstName(lead);
-  if (!lead.nombre) return greeting(lang);
+  if (!lead.nombre || !lead.nombre_confirmado) return greeting(lang, now);
   if (!lead.estatus) return lang === "en"
-    ? `Nice to meet you, ${name}. Are you retired or receiving a pension?`
-    : `Mucho gusto, ${name}. ¿Usted es jubilado o pensionado?`;
+    ? `${patch.nombre ? `Nice to meet you, ${name}. ` : ""}Are you retired or receiving a pension?`
+    : `${patch.nombre ? `Mucho gusto, ${name}. ` : ""}¿Usted es jubilado o pensionado?`;
   if (!lead.dependencia) return lang === "en"
     ? "Which institution provides your pension: IMSS, ISSSTE, CFE, SNTE, or PEMEX?"
-    : "¿De qué dependencia recibe su pensión: IMSS, ISSSTE, CFE, SNTE o PEMEX?";
+    : `${patch.estatus ? "Gracias. " : ""}¿De qué institución recibe su pensión?`;
   if (!lead.monto_solicitado) return lang === "en"
     ? "How much would you like to request?"
-    : "¿De cuánto es el préstamo que está solicitando?";
+    : `${patch.dependencia ? "Perfecto. " : ""}¿Qué cantidad le gustaría solicitar?`;
   if (!lead.credito_vigente) return lang === "en"
     ? "Do you currently have a loan with another company serving retirees and pensioners?"
-    : "¿Actualmente tiene algún préstamo vigente con otra empresa de préstamos para jubilados y pensionados?";
+    : `${patch.monto_solicitado ? `Entendido, solicita ${displayAmount(patch.monto_solicitado)}. ` : ""}¿Actualmente tiene algún préstamo vigente con otra financiera?`;
   if (lead.credito_vigente === "si" && !lead.empresa_credito) return lang === "en"
     ? "Which company is it with?"
-    : "¿Con qué empresa lo tiene?";
+    : `${patch.credito_vigente === "si" ? "Gracias por comentármelo. " : ""}¿Con qué empresa lo tiene?`;
   if (lead.credito_vigente === "si" && !lead.antiguedad_credito) return lang === "en"
     ? "When did you take out that loan?"
     : "¿Hace cuánto tiempo sacó ese préstamo?";
   return null;
+}
+
+function displayAmount(value: string): string {
+  const digits = value.trim().replace(/[$,\s]/g, "");
+  return /^\d+(\.\d{1,2})?$/.test(digits)
+    ? `$${new Intl.NumberFormat("es-MX", { maximumFractionDigits: 2 }).format(Number(digits))}`
+    : value;
 }
 
 export const addressOnly = () => ADDRESS;
@@ -58,7 +68,7 @@ export function notEligible(lead: LeadData, lang: Lang): string {
 export function askDay(lang: Lang): string {
   return lang === "en"
     ? "Thank you. We can now schedule an appointment with an advisor. What day works best for you?"
-    : "Gracias. Ya podemos agendarle una cita con un asesor. ¿Qué día le queda mejor?";
+    : "Gracias. Podemos agendar una cita para que un asesor revise su solicitud y le explique las opciones. ¿Qué día y hora le acomodan?";
 }
 
 export function offerTimes(times: string[], lang: Lang): string {
@@ -70,9 +80,11 @@ export function offerTimes(times: string[], lang: Lang): string {
 }
 
 export function confirmProposal(date: string, time: string, lang: Lang): string {
+  const instant = localDateTimeToUtc(date, time);
+  const label = instant ? formatLocalAppointment(instant.toISOString()).label : `${date} ${time}`;
   return lang === "en"
     ? `${date} at ${time} is available. Would you like me to confirm it?`
-    : `El ${date} a las ${time} está disponible. ¿Desea que se la confirme?`;
+    : `Sí, el ${label} está disponible. ¿Le confirmo ese horario?`;
 }
 
 export function occupied(times: string[], lang: Lang): string {
@@ -92,12 +104,10 @@ export function sundayAdvisor(lang: Lang): string {
 export function confirmed(lead: LeadData, label: string, lang: Lang): string[] {
   const name = firstName(lead);
   if (lang === "en") return [
-    `All set, ${name}. Your appointment is confirmed for ${label}. Address: ${ADDRESS}. An advisor will be expecting you.`,
-    "Your information has been registered and shared with the team. Thank you for your trust. 🙏",
+    `All set${name ? `, ${name}` : ""}. Your appointment is confirmed for ${label}.\n\n📍 ${ADDRESS}.\n\nWe look forward to seeing you. If you need to change the time, message us here.`,
   ];
   return [
-    `¡Listo, ${name}! Su cita queda confirmada para el ${label}. 📍 ${ADDRESS}. Un asesor lo estará esperando.`,
-    "Ya registré su información y se la pasé al equipo. Muchas gracias por su confianza. 🙏",
+    `Listo${name ? `, ${name}` : ""}, su cita quedó agendada para el ${label}.\n\n📍 ${ADDRESS}.\n\nAquí le esperamos. Si necesita cambiar el horario, puede escribirnos por este mismo medio.`,
   ];
 }
 
