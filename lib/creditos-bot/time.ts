@@ -69,16 +69,15 @@ export function isPastLocalSlot(localDate: string, localTime: string, now = new 
 export function formatLocalAppointment(iso: string): { date: string; time: string; label: string } {
   const instant = new Date(iso);
   const parts = utcToLocalParts(instant);
-  const label = new Intl.DateTimeFormat("es-MX", {
+  const dayLabel = new Intl.DateTimeFormat("es-MX", {
     timeZone: TIME_ZONE,
     weekday: "long",
     day: "numeric",
     month: "long",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
   }).format(instant);
+  const [hour, minute] = parts.time.split(":").map(Number);
+  const period = hour < 12 ? "de la mañana" : hour < 19 ? "de la tarde" : "de la noche";
+  const label = `${dayLabel} a ${hour % 12 === 1 ? "la" : "las"} ${hour % 12 || 12}${minute ? `:${String(minute).padStart(2, "0")}` : ""} ${period}`;
   return { ...parts, label };
 }
 
