@@ -25,6 +25,14 @@ registerHooks({
       if (!target) return nextResolve(specifier, context);
       return nextResolve(pathToFileURL(target).href, context);
     }
+    // Imports relativos sin extensión (p.ej. `./agenda` dentro de lib/creditos-bot)
+    // se resuelven probando extensiones, igual que el alias @/.
+    if (specifier.startsWith("./") || specifier.startsWith("../")) {
+      if (specifier.split("/").pop()?.includes(".")) return nextResolve(specifier, context);
+      const base = resolve(dirname(fileURLToPath(context.parentURL)), specifier);
+      const target = withExtension(base);
+      if (target) return nextResolve(pathToFileURL(target).href, context);
+    }
     return nextResolve(specifier, context);
   },
 });
