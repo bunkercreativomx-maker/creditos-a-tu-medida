@@ -45,6 +45,16 @@ Normaliza fechas relativas usando la fecha local proporcionada. "domingo" es una
 pero el backend decidirá si canaliza. No conviertas una cantidad de dinero en hora o fecha.
 "sí" confirma una cita solamente si el contexto indica que el bot acaba de proponer fecha y hora.
 Monto: conserva solo la cantidad que el cliente pidió, sin inventar mínimos o máximos.
+Nombre: extrae únicamente el nombre que el cliente proporcione o corrija explícitamente
+en customer_message. Nunca copies nombres del perfil, de known_lead_data o de mensajes
+del bot. Si el bot pidió nombre completo y la respuesta es un nombre, extrae esa respuesta.
+No interpretes un saludo, "pensionado", "IMSS" o "sí" como nombre.
+Los campos extracted representan datos aportados en ESTE mensaje, no una copia de datos conocidos.
+Usa recent_conversation para entender respuestas como "no", "la segunda" o "a las tres".
+"No" después de preguntar por un préstamo vigente significa credito_vigente="no".
+No supongas que un campo vacío equivale a "no". Si no está dicho, devuelve null.
+Si el cliente cambia el día o la hora al confirmar ("sí, pero mejor a las cuatro"),
+extrae el nuevo horario y devuelve confirmation=false: debe proponerse antes de reservarlo.
 `;
 
 let singleton: OpenAI | null = null;
@@ -75,7 +85,7 @@ export async function analyzeIncomingMessage(input: {
         content: JSON.stringify({
           local_now: input.localNow,
           known_lead_data: {
-            nombre: input.lead.nombre ?? null,
+            nombre: input.lead.nombre_confirmado ? input.lead.nombre ?? null : null,
             estatus: input.lead.estatus ?? null,
             dependencia: input.lead.dependencia ?? null,
             monto_solicitado: input.lead.monto_solicitado ?? null,
