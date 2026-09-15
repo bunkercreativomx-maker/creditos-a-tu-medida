@@ -34,6 +34,7 @@ export async function runNewEngineTurn(args: {
   accountId: string;
   messageId: string;
   text: string;
+  history?: Array<{ role: "user" | "assistant"; content: string }>;
 }): Promise<boolean> {
   if (!process.env.OPENAI_API_KEY || !process.env.OPENAI_MODEL) {
     return false; // sin key: no competir con el flujo actual
@@ -44,7 +45,7 @@ export async function runNewEngineTurn(args: {
   const appointments = new PocketBaseAppointmentRepository(pb);
 
   const result = await processIncomingTurn(
-    { leadId: args.leadId, messageId: args.messageId, text: args.text },
+    { leadId: args.leadId, messageId: args.messageId, text: args.text, history: args.history },
     { leads, appointments },
   );
 
@@ -52,6 +53,9 @@ export async function runNewEngineTurn(args: {
 
   // Enviar por Zernio, en orden, y persistir cada respuesta del bot.
   for (const content of result.messages) {
+    const conversation = await pb.collection("conversations").getOne(args.conversationId);
+    if (conversation.bot_activo === false || conversation.necesita_asesor === true ||
+        !(await leads.isLatestInboundMessage(args.leadId, args.messageId))) return true;
     await sendWhatsAppMessage(args.conversationZernioId, args.accountId, content);
     await pb.collection("messages").create({
       conversation: args.conversationId,
