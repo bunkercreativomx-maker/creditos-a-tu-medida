@@ -57,8 +57,8 @@ export function notEligible(lead: LeadData, lang: Lang): string {
 
 export function askDay(lang: Lang): string {
   return lang === "en"
-    ? "Thank you. We can now schedule a free appointment with an advisor. What day works best for you?"
-    : "Gracias. Ya podemos agendarle una cita sin costo con un asesor. ¿Qué día le queda mejor?";
+    ? "Thank you. We can now schedule an appointment with an advisor. What day works best for you?"
+    : "Gracias. Ya podemos agendarle una cita con un asesor. ¿Qué día le queda mejor?";
 }
 
 export function offerTimes(times: string[], lang: Lang): string {
