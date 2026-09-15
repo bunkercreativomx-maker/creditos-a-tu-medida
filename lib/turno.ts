@@ -70,6 +70,8 @@ export type TurnoPb = {
 };
 
 export type TurnoDeps = {
+  /** Adaptador opcional para probar el despacho sin llamar servicios reales. */
+  runNewEngineTurn?: typeof import("@/lib/creditos-bot/integration").runNewEngineTurn;
   /** Cliente PocketBase (admin en runtime; adaptador mock en tests). */
   pb: TurnoPb;
   /** Enviar un mensaje de WhatsApp real (Zernio). */
@@ -154,25 +156,6 @@ export async function procesarTurnoBot(
   } = deps;
   const pbConversationId = parsed.conversationId;
   const pbAccountId = parsed.accountId;
-
-  // MOTOR NUEVO (OpenAI): si está configurado, cada mensaje lo atiende el nuevo
-  // motor creditos-bot. Sin OPENAI_API_KEY se conserva el flujo actual (Gemini/
-  // DeepSeek) intacto — así la rama no altera producción hasta que se active.
-  if (process.env.OPENAI_API_KEY && process.env.OPENAI_MODEL) {
-    const { runNewEngineTurn } = await import("@/lib/creditos-bot/integration");
-    const atendido = await runNewEngineTurn({
-      leadId,
-      conversationId,
-      conversationZernioId: pbConversationId ?? conversationId,
-      accountId: pbAccountId ?? "",
-      messageId: mensajeId ?? "",
-      text: String(parsed.text ?? ""),
-    }).catch((err) => {
-      console.error("[turno] error en el motor nuevo, se relega al flujo actual:", err);
-      return false;
-    });
-    if (atendido) return;
-  }
 
   try {
     // Marca la conversación para intervención humana (sin tocar bot_activo).
@@ -360,6 +343,27 @@ export async function procesarTurnoBot(
         }
         return { role, content };
       });
+
+    // Comparte la transcripción y el historial con el motor nuevo antes de los
+    // manejadores viejos. Una falla nunca vuelve a ejecutar efectos en otro motor.
+    if (process.env.OPENAI_API_KEY && process.env.OPENAI_MODEL) {
+      try {
+        const runNewEngineTurn = deps.runNewEngineTurn ?? (await import("@/lib/creditos-bot/integration")).runNewEngineTurn;
+        await runNewEngineTurn({
+          leadId, conversationId,
+          conversationZernioId: pbConversationId ?? conversationId,
+          accountId: pbAccountId ?? "",
+          messageId: mensajeId ?? "",
+          text: textoHoy,
+          history: history.slice(0, -1),
+        });
+      } catch (err) {
+        console.error("[turno] error en el motor nuevo; requiere asesor:", err);
+        await marcarParaAsesor();
+        await notifyNeedsAdvisor(leadId).catch(() => {});
+      }
+      return;
+    }
 
     // ¿Primer mensaje del bot en esta conversación? (el saludo va fijo)
     const esPrimerTurno = !latestItems.some((m) => m.remitente === "bot");
