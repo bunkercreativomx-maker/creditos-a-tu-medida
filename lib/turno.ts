@@ -155,6 +155,25 @@ export async function procesarTurnoBot(
   const pbConversationId = parsed.conversationId;
   const pbAccountId = parsed.accountId;
 
+  // MOTOR NUEVO (OpenAI): si está configurado, cada mensaje lo atiende el nuevo
+  // motor creditos-bot. Sin OPENAI_API_KEY se conserva el flujo actual (Gemini/
+  // DeepSeek) intacto — así la rama no altera producción hasta que se active.
+  if (process.env.OPENAI_API_KEY && process.env.OPENAI_MODEL) {
+    const { runNewEngineTurn } = await import("@/lib/creditos-bot/integration");
+    const atendido = await runNewEngineTurn({
+      leadId,
+      conversationId,
+      conversationZernioId: pbConversationId ?? conversationId,
+      accountId: pbAccountId ?? "",
+      messageId: mensajeId ?? "",
+      text: String(parsed.text ?? ""),
+    }).catch((err) => {
+      console.error("[turno] error en el motor nuevo, se relega al flujo actual:", err);
+      return false;
+    });
+    if (atendido) return;
+  }
+
   try {
     // Marca la conversación para intervención humana (sin tocar bot_activo).
     const marcarParaAsesor = async () => {
