@@ -1,7 +1,7 @@
 import { AgendaService } from "./agenda";
 import * as msg from "./messages";
 import { isEligibleDependency } from "./policy";
-import { formatLocalAppointment, localNow } from "./time";
+import { formatLocalAppointment } from "./time";
 import type { LeadData, LeadRepository, MessageAnalysis, TurnResult } from "./types";
 
 function cleanText(value: string | null): string | null {
@@ -12,7 +12,10 @@ function cleanText(value: string | null): string | null {
 function extractedPatch(a: MessageAnalysis): Partial<LeadData> {
   const e = a.extracted;
   const patch: Partial<LeadData> = {};
-  if (e.nombre) patch.nombre = cleanText(e.nombre);
+  if (cleanText(e.nombre)) {
+    patch.nombre = cleanText(e.nombre);
+    patch.nombre_confirmado = true;
+  }
   if (e.estatus) patch.estatus = e.estatus;
   if (e.dependencia) patch.dependencia = e.dependencia;
   if (e.dependencia_otra) patch.dependencia_otra = cleanText(e.dependencia_otra);
@@ -43,10 +46,10 @@ export class ConversationEngine {
     const patch = extractedPatch(analysis);
     let lead = Object.keys(patch).length ? await this.leads.update(leadBefore.id, patch) : leadBefore;
 
-    if (analysis.intent === "pedir_direccion") return { messages: [msg.addressOnly()], escalate: false, leadPatch: patch };
     if (analysis.needs_human || analysis.intent === "hablar_con_persona" || analysis.intent === "pregunta_restringida") {
-      return { messages: [msg.advisor(lang)], escalate: true, leadPatch: patch };
+      return { messages: [analysis.intent === "pedir_direccion" ? `${msg.addressOnly()}\n\n${msg.advisor(lang)}` : msg.advisor(lang)], escalate: true, leadPatch: patch };
     }
+    if (analysis.intent === "pedir_direccion") return { messages: [msg.addressOnly()], escalate: false, leadPatch: patch };
 
     if (analysis.intent === "cancelar_cita") {
       try {
@@ -70,7 +73,7 @@ export class ConversationEngine {
       return { messages: [msg.notEligible(lead, lang)], escalate: false, leadPatch: patch };
     }
 
-    const question = msg.nextQuestion(lead, lang);
+    const question = msg.nextQuestion(lead, lang, patch, now);
     if (question) return { messages: [question], escalate: false, leadPatch: patch };
 
     const proposedDate = analysis.extracted.fecha ?? lead.cita_propuesta_fecha ?? null;
@@ -80,7 +83,10 @@ export class ConversationEngine {
       return { messages: [lang === "en" ? "What new day works best for you?" : "¿Qué nuevo día le queda mejor?"], escalate: false };
     }
 
-    if (analysis.confirmation || analysis.intent === "confirmar_cita") {
+    const changedProposal =
+      (analysis.extracted.fecha !== null && analysis.extracted.fecha !== lead.cita_propuesta_fecha) ||
+      (analysis.extracted.hora !== null && analysis.extracted.hora !== lead.cita_propuesta_hora);
+    if ((analysis.confirmation || analysis.intent === "confirmar_cita") && !changedProposal) {
       if (!lead.cita_propuesta_fecha || !lead.cita_propuesta_hora) return { messages: [msg.askDay(lang)], escalate: false };
       const booked = await this.agenda.bookOrReschedule(lead, lead.cita_propuesta_fecha, lead.cita_propuesta_hora, now);
       if (!booked.ok) {
