@@ -16,6 +16,7 @@ export function createClient() {
       document.cookie = pb.authStore.exportToCookie({
         httpOnly: false,
         sameSite: "lax",
+        secure: window.location.protocol === "https:",
         path: "/",
       }, "pb_auth");
     });

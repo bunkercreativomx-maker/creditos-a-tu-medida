@@ -1,13 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createServerClient } from "@/lib/pocketbase-server";
+import { requireServerClient } from "@/lib/pocketbase-server";
 import { notifyNewLead, notifyWebFormNeedsAdvisor } from "@/lib/push";
 import type { LeadStatus, UserRole, OperacionStatus, OperacionTipo, CitaTipo } from "@/lib/types";
 
 /** Registra una acción en la bitácora del lead (historial). */
 async function logAudit(
-  pb: Awaited<ReturnType<typeof createServerClient>>,
+  pb: Awaited<ReturnType<typeof requireServerClient>>,
   leadId: string,
   accion: string,
   detalle?: string
@@ -30,7 +30,7 @@ async function logAudit(
 }
 
 export async function updateLeadStatus(leadId: string, status: LeadStatus) {
-  const pb = await createServerClient();
+  const pb = await requireServerClient();
   try {
     await pb.collection("leads").update(leadId, { status });
     await logAudit(pb, leadId, "Cambio de etapa", `Etapa → ${status}`);
@@ -42,7 +42,7 @@ export async function updateLeadStatus(leadId: string, status: LeadStatus) {
 }
 
 export async function createLead(data: Record<string, unknown>) {
-  const pb = await createServerClient();
+  const pb = await requireServerClient();
   const payload = {
     telefono: String(data.telefono ?? ""),
     nombre: data.nombre ? String(data.nombre) : null,
@@ -81,7 +81,7 @@ export async function createLead(data: Record<string, unknown>) {
 }
 
 export async function updateLead(leadId: string, data: Record<string, unknown>) {
-  const pb = await createServerClient();
+  const pb = await requireServerClient();
   const payload: Record<string, unknown> = {};
   for (const key of [
     "nombre", "apellido", "email", "telefono",
@@ -108,7 +108,7 @@ export async function updateLead(leadId: string, data: Record<string, unknown>) 
  * vuelve a escribir, el webhook lo desarchiva automáticamente.
  */
 export async function archivarLead(leadId: string, archivado: boolean) {
-  const pb = await createServerClient();
+  const pb = await requireServerClient();
   const user = pb.authStore.model as { id?: string } | null;
   if (!user?.id) throw new Error("No autenticado");
   await pb.collection("leads").update(leadId, { archivado });
@@ -119,7 +119,7 @@ export async function archivarLead(leadId: string, archivado: boolean) {
 }
 
 export async function claimLead(leadId: string) {
-  const pb = await createServerClient();
+  const pb = await requireServerClient();
   const user = pb.authStore.model as { id?: string; full_name?: string; name?: string; email?: string } | null;
   if (!user?.id) throw new Error("No autenticado");
 
@@ -152,7 +152,7 @@ export async function claimLead(leadId: string) {
  * WhatsApp para que el nuevo asesor asuma el control (igual que al tomarlo).
  */
 export async function reassignLead(leadId: string, nuevoAsignadoId: string) {
-  const pb = await createServerClient();
+  const pb = await requireServerClient();
   const user = pb.authStore.model as
     | { id?: string; role?: string; full_name?: string; name?: string; email?: string }
     | null;
@@ -199,7 +199,7 @@ export async function reassignLead(leadId: string, nuevoAsignadoId: string) {
 }
 
 export async function addLeadNote(leadId: string, nota: string) {
-  const pb = await createServerClient();
+  const pb = await requireServerClient();
   const user = pb.authStore.model;
   if (!user?.id) throw new Error("No autenticado");
 
@@ -212,13 +212,13 @@ export async function addLeadNote(leadId: string, nota: string) {
 }
 
 export async function toggleBotActivo(conversationId: string, botActivo: boolean) {
-  const pb = await createServerClient();
+  const pb = await requireServerClient();
   await pb.collection("conversations").update(conversationId, { bot_activo: botActivo });
   revalidatePath("/crm");
 }
 
 export async function sendAdvisorMessage(conversationId: string, telefono: string, contenido: string) {
-  const pb = await createServerClient();
+  const pb = await requireServerClient();
   await pb.collection("messages").create({
       conversation: conversationId,
       remitente: "asesor",
@@ -255,7 +255,7 @@ export async function sendAdvisorMessage(conversationId: string, telefono: strin
 }
 
 export async function deleteLead(leadId: string) {
-  const pb = await createServerClient();
+  const pb = await requireServerClient();
   const user = pb.authStore.model as { id?: string; role?: string } | null;
 
   // Regla de negocio: SOLO el admin puede borrar leads.
@@ -291,7 +291,7 @@ export async function deleteLead(leadId: string) {
 }
 
 export async function updateUserRole(profileId: string, role: UserRole) {
-  const pb = await createServerClient();
+  const pb = await requireServerClient();
   const user = pb.authStore.model;
 
   // Defensa en profundidad: solo admins pueden cambiar roles.
@@ -308,7 +308,7 @@ export async function updateUserRole(profileId: string, role: UserRole) {
 // ---- Operaciones (tablero de financieras) ----
 
 export async function createOperacion(data: Record<string, unknown>) {
-  const pb = await createServerClient();
+  const pb = await requireServerClient();
   const payload = {
     lead: String(data.lead),
     financiera: data.financiera ? String(data.financiera) : null,
@@ -326,7 +326,7 @@ export async function createOperacion(data: Record<string, unknown>) {
 }
 
 export async function updateOperacion(operacionId: string, data: Record<string, unknown>) {
-  const pb = await createServerClient();
+  const pb = await requireServerClient();
   const payload: Record<string, unknown> = {};
   if ("financiera" in data) payload.financiera = data.financiera ? String(data.financiera) : null;
   if ("monto_prestado" in data) payload.monto_prestado = data.monto_prestado ? Number(data.monto_prestado) : null;
@@ -342,7 +342,7 @@ export async function updateOperacion(operacionId: string, data: Record<string, 
 }
 
 export async function deleteOperacion(operacionId: string) {
-  const pb = await createServerClient();
+  const pb = await requireServerClient();
   await pb.collection("operaciones").delete(operacionId);
   revalidatePath("/crm/financieras");
 }
@@ -350,7 +350,7 @@ export async function deleteOperacion(operacionId: string) {
 // ---- Citas (calendario) ----
 
 export async function createCita(data: Record<string, unknown>) {
-  const pb = await createServerClient();
+  const pb = await requireServerClient();
   const payload = {
     lead: data.lead ? String(data.lead) : null,
     titulo: data.titulo ? String(data.titulo) : null,
@@ -364,7 +364,7 @@ export async function createCita(data: Record<string, unknown>) {
 }
 
 export async function updateCita(citaId: string, data: Record<string, unknown>) {
-  const pb = await createServerClient();
+  const pb = await requireServerClient();
   const payload: Record<string, unknown> = {};
   if ("titulo" in data) payload.titulo = data.titulo ? String(data.titulo) : null;
   if ("fecha" in data) payload.fecha = String(data.fecha);
@@ -376,7 +376,7 @@ export async function updateCita(citaId: string, data: Record<string, unknown>) 
 }
 
 export async function deleteCita(citaId: string) {
-  const pb = await createServerClient();
+  const pb = await requireServerClient();
   await pb.collection("citas").delete(citaId);
   revalidatePath("/crm/calendario");
 }
