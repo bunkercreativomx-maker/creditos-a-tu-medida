@@ -21,6 +21,10 @@ export const metadata: Metadata = {
   title: "Créditos a tu medida | Créditos vía nómina",
   description:
     "Créditos vía nómina para pensionados, jubilados, gobierno y educación, en alianza con Financiera Fortaleza. Aprobación rápida, sin complicaciones.",
+  // Verificación de dominio de Meta (Business Manager > Seguridad de la marca > Dominios > Meta-tag)
+  ...(process.env.NEXT_PUBLIC_FB_DOMAIN_VERIFICATION
+    ? { other: { "facebook-domain-verification": process.env.NEXT_PUBLIC_FB_DOMAIN_VERIFICATION } }
+    : {}),
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
