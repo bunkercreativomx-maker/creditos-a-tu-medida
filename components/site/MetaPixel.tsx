@@ -14,7 +14,8 @@ import { useEffect } from "react";
  * No se envía ningún dato personal por el navegador (política financiera de Meta);
  * la coincidencia de usuario va por Conversions API desde el servidor, con hash.
  */
-export const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID ?? "";
+// ID público del Pixel (no es secreto). Se puede sobreescribir con la variable en Vercel.
+export const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID || "1401885575462193";
 
 type Fbq = (...args: unknown[]) => void;
 function fbq(): Fbq | null {

@@ -7,7 +7,7 @@ import { createHash } from "crypto";
  * para que Meta lo deduplique. Datos personales van SOLO hasheados (SHA-256).
  * Nunca rompe el flujo del formulario: cualquier error se registra y se ignora.
  */
-const PIXEL = process.env.NEXT_PUBLIC_META_PIXEL_ID ?? "";
+const PIXEL = process.env.NEXT_PUBLIC_META_PIXEL_ID || "1401885575462193";
 const TOKEN = process.env.META_CAPI_TOKEN ?? "";
 const TEST_CODE = process.env.META_CAPI_TEST_CODE ?? ""; // opcional, para "Probar eventos"
 
