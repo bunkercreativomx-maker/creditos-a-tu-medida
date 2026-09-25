@@ -10,6 +10,7 @@ import { notifyNewLeadToSlack } from "@/lib/slack-notify";
 import { notifyNewLead, notifyNeedsAdvisor } from "@/lib/push";
 import { transcribirAudioUrl } from "@/lib/transcribe";
 import { procesarEntrante, type EntrantePb } from "@/lib/webhook-entrante";
+import { readLimitedText, RequestTooLarge, isWebhookEnvelope } from "@/lib/request-security";
 
 // El trabajo pesado (STT + LLM + envío) corre DESPUÉS de responder a Zernio (after()).
 export const maxDuration = 60;
@@ -28,7 +29,11 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const rawBody = await req.text();
+  let rawBody: string;
+  try { rawBody = await readLimitedText(req, 1024 * 1024); }
+  catch (error) {
+    return NextResponse.json({ error: "Solicitud inválida" }, { status: error instanceof RequestTooLarge ? 413 : 400 });
+  }
   const signature = req.headers.get("X-Zernio-Signature");
 
   if (!verifyZernioSignature(rawBody, signature)) {
@@ -38,6 +43,7 @@ export async function POST(req: NextRequest) {
   let event: ZernioInboundEvent;
   try {
     event = JSON.parse(rawBody) as ZernioInboundEvent;
+    if (!isWebhookEnvelope(event)) throw new Error("Evento inválido");
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
