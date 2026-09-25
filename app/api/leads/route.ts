@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/pocketbase-admin";
 import { notifyNewLead, notifyWebFormNeedsAdvisor } from "@/lib/push";
+import { enviarLeadCapi } from "@/lib/meta-capi";
 import type { LeadOrigen, TipoCredito, Genero, EstadoCivil } from "@/lib/types";
 
 const DOCUMENT_FIELDS = [
@@ -106,6 +107,18 @@ export async function POST(req: NextRequest) {
     nombre: insertPayload.nombre as string | null,
     apellido: insertPayload.apellido as string | null,
     monto_aproximado: insertPayload.monto_aproximado as string | null,
+  });
+
+  // Meta Conversions API (se omite sola si no hay pixel/token configurados)
+  await enviarLeadCapi({
+    eventId: str(form.get("event_id")) ?? lead.id,
+    telefono,
+    nombre: insertPayload.nombre as string | null,
+    sourceUrl: req.headers.get("referer"),
+    ip: (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || null,
+    userAgent: req.headers.get("user-agent"),
+    fbp: req.cookies.get("_fbp")?.value ?? null,
+    fbc: req.cookies.get("_fbc")?.value ?? null,
   });
 
   return NextResponse.json({ ok: true, lead_id: lead.id }, { status: 201 });

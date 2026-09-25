@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Fraunces, Manrope } from "next/font/google";
 import "./globals.css";
 import { FloatingWhatsApp } from "@/components/site/FloatingWhatsApp";
+import { MetaPixel } from "@/components/site/MetaPixel";
 
 const fraunces = Fraunces({
   variable: "--font-display",
@@ -28,6 +29,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-full flex-col bg-cream-50 font-sans text-ink-900">
         {children}
         <FloatingWhatsApp />
+        <MetaPixel />
       </body>
     </html>
   );

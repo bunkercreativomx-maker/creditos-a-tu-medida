@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { WHATSAPP_LINK } from "@/lib/site-content";
 import { WhatsAppIcon } from "./WhatsAppIcon";
+import { trackLead } from "./MetaPixel";
 
 type Estado = "idle" | "enviando" | "ok" | "error";
 
@@ -33,10 +34,13 @@ export function RapidFunnel() {
     fd.append("nss", nss.trim());
     fd.append("telefono", telefono.trim());
     fd.append("origen", "web_form");
+    const eventId = crypto.randomUUID();
+    fd.append("event_id", eventId);
 
     try {
       const res = await fetch("/api/leads", { method: "POST", body: fd });
       if (res.ok) {
+        trackLead(eventId);
         setEstado("ok");
       } else {
         const data = await res.json().catch(() => null);

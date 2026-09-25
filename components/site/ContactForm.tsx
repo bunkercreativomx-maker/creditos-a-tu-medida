@@ -4,6 +4,7 @@ import { useState, type ChangeEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { MONTOS_APROXIMADOS } from "@/lib/site-content";
 import { calcularEdad } from "@/lib/edad";
+import { trackLead } from "./MetaPixel";
 
 type Status = "idle" | "sending" | "sent" | "error";
 type DocKey = "ine_frente" | "ine_reverso" | "comprobante_domicilio";
@@ -51,10 +52,13 @@ export function ContactForm() {
     const form = new FormData();
     Object.entries(data).forEach(([key, value]) => form.append(key, value));
     Object.entries(files).forEach(([key, file]) => file && form.append(key, file));
+    const eventId = crypto.randomUUID();
+    form.append("event_id", eventId);
 
     try {
       const res = await fetch("/api/leads", { method: "POST", body: form });
       if (!res.ok) throw new Error("request failed");
+      trackLead(eventId);
       setStatus("sent");
     } catch {
       setStatus("error");
