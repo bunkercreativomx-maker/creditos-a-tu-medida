@@ -11,6 +11,7 @@ const NAV_LINKS = [
   { href: "#proceso", label: "Proceso" },
   { href: "#requisitos", label: "Requisitos" },
   { href: "#ubicacion", label: "Ubicación" },
+  { href: "/blog", label: "Blog" },
 ];
 
 export function Header() {
