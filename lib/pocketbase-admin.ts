@@ -20,6 +20,23 @@ export async function createAdminClient() {
     throw new Error("Faltan PB_ADMIN_EMAIL / PB_ADMIN_PASSWORD en el entorno");
   }
 
+  // Un token cacheado puede quedar INVÁLIDO antes de expirar (p. ej. si el
+  // contenedor de PocketBase se recrea y re-guarda la contraseña del superusuario
+  // → PB rota el tokenKey). Una lambda caliente seguiría mandando el token muerto
+  // y TODO el webhook respondería 500. Por eso se valida con authRefresh y, si
+  // falla, se re-autentica con contraseña.
+  if (_adminToken && Date.now() <= _adminTokenExpiry - 60_000) {
+    pb.authStore.save(_adminToken, null);
+    try {
+      const refreshed = await pb.collection("_superusers").authRefresh();
+      _adminToken = refreshed.token;
+      return pb;
+    } catch {
+      _adminToken = null;
+      pb.authStore.clear();
+    }
+  }
+
   // Refrescar si no hay token o está a menos de 60s de expirar
   if (!_adminToken || Date.now() > _adminTokenExpiry - 60_000) {
     const auth = await pb
