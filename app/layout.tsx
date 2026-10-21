@@ -26,7 +26,9 @@ export const metadata: Metadata = {
   // Verificación de dominio de Meta (Business Manager > Seguridad de la marca > Dominios > Meta-tag)
   other: {
     "facebook-domain-verification":
-      process.env.NEXT_PUBLIC_FB_DOMAIN_VERIFICATION || "k700d1rvuyi63yl0tvri5tbojr9tex",
+      // Acepta el código solo o la etiqueta completa pegada en Vercel.
+      (process.env.NEXT_PUBLIC_FB_DOMAIN_VERIFICATION ?? "").match(/[a-z0-9]{20,}/)?.[0] ||
+      "k700d1rvuyi63yl0tvri5tbojr9tex",
   },
 };
 
