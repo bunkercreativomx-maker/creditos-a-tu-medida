@@ -55,6 +55,11 @@ export type PbLead = {
   status: LeadStatus;
   asignado_a: string | null;
   archivado?: boolean | null;
+  // Señales Meta (CAPI) guardadas al crear el lead desde el sitio
+  meta_fbp?: string | null;
+  meta_fbc?: string | null;
+  meta_ip?: string | null;
+  meta_ua?: string | null;
   vencimiento_documentos: string | null;
   // Campos file (documentos) — guardan el nombre del archivo en PB
   ine_frente: string | null;

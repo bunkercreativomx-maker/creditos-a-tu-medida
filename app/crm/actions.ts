@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createServerClient } from "@/lib/pocketbase-server";
 import { notifyNewLead, notifyWebFormNeedsAdvisor } from "@/lib/push";
+import { enviarEtapaCapi, EVENTO_POR_ETAPA, type LeadParaEtapa } from "@/lib/meta-capi";
 import type { LeadStatus, UserRole, OperacionStatus, OperacionTipo, CitaTipo } from "@/lib/types";
 
 /** Registra una acción en la bitácora del lead (historial). */
@@ -32,8 +33,13 @@ async function logAudit(
 export async function updateLeadStatus(leadId: string, status: LeadStatus) {
   const pb = await createServerClient();
   try {
-    await pb.collection("leads").update(leadId, { status });
+    const lead = await pb.collection("leads").update<LeadParaEtapa>(leadId, { status });
     await logAudit(pb, leadId, "Cambio de etapa", `Etapa → ${status}`);
+    // Etapa del embudo → Meta CAPI (no bloquea ni rompe si falla; se omite sin token)
+    if (EVENTO_POR_ETAPA[status]) {
+      const ok = await enviarEtapaCapi(lead, status);
+      if (ok) await logAudit(pb, leadId, "Meta", `Evento ${EVENTO_POR_ETAPA[status]} enviado`);
+    }
   } catch (err) {
     throw new Error((err as Error)?.message ?? "Error al actualizar estado");
   }

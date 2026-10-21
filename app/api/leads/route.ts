@@ -55,6 +55,11 @@ export async function POST(req: NextRequest) {
     banco: str(form.get("banco")),
     clabe: str(form.get("clabe")),
     status: "nuevo",
+    // Señales de Meta guardadas para mandar después las etapas del CRM (CAPI)
+    meta_fbp: req.cookies.get("_fbp")?.value ?? null,
+    meta_fbc: req.cookies.get("_fbc")?.value ?? null,
+    meta_ip: (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || null,
+    meta_ua: (req.headers.get("user-agent") ?? "").slice(0, 600) || null,
   };
 
   let lead: { id: string } | null = null;
@@ -112,13 +117,16 @@ export async function POST(req: NextRequest) {
   // Meta Conversions API (se omite sola si no hay pixel/token configurados)
   await enviarLeadCapi({
     eventId: str(form.get("event_id")) ?? lead.id,
+    leadId: lead.id,
     telefono,
     nombre: insertPayload.nombre as string | null,
+    apellido: insertPayload.apellido as string | null,
+    email: insertPayload.email as string | null,
     sourceUrl: req.headers.get("referer"),
-    ip: (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || null,
-    userAgent: req.headers.get("user-agent"),
-    fbp: req.cookies.get("_fbp")?.value ?? null,
-    fbc: req.cookies.get("_fbc")?.value ?? null,
+    ip: insertPayload.meta_ip as string | null,
+    userAgent: insertPayload.meta_ua as string | null,
+    fbp: insertPayload.meta_fbp as string | null,
+    fbc: insertPayload.meta_fbc as string | null,
   });
 
   return NextResponse.json({ ok: true, lead_id: lead.id }, { status: 201 });
