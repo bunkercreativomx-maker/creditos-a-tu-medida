@@ -1,5 +1,6 @@
 import { createServerClient } from "@/lib/pocketbase-server";
 import { CrmNav } from "@/components/crm/CrmNav";
+import { SessionKeepAlive } from "@/components/crm/SessionKeepAlive";
 import type { Metadata } from "next";
 
 // El CRM es la única parte instalable como PWA (la landing no debe ofrecerlo).
@@ -77,6 +78,7 @@ export default async function CrmLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
+      <SessionKeepAlive />
       <CrmNav
         fullName={fullName}
         role={user.role ?? "asesor"}

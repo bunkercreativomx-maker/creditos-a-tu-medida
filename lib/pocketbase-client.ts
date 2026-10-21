@@ -14,7 +14,10 @@ export function createClient() {
     // Cada cambio de auth se refleja en la cookie → visible para el server
     pb.authStore.onChange(() => {
       document.cookie = pb.authStore.exportToCookie({
+        // `expires` lo pone el SDK = vencimiento del token; SessionKeepAlive
+        // renueva el token y con eso se extiende la cookie.
         httpOnly: false,
+        secure: location.protocol === "https:",
         sameSite: "lax",
         path: "/",
       }, "pb_auth");
