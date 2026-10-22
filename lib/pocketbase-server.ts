@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { createBaseClient } from "@/lib/pocketbase";
+import { restoreVerifiedSession } from "@/lib/verified-session";
 
 /**
  * Cliente PocketBase para Server Components y Server Actions.
@@ -12,19 +13,15 @@ export async function createServerClient() {
   const cookieStore = await cookies();
   const pbAuthValue = cookieStore.get("pb_auth")?.value ?? "";
 
-  if (pbAuthValue) {
-    // loadFromCookie espera el string completo "pb_auth=<valor>",
-    // no solo el valor (isValid sería false si pasamos solo el value).
-    pb.authStore.loadFromCookie(`pb_auth=${pbAuthValue}`, "pb_auth");
-    try {
-      if (pb.authStore.isValid) {
-        await pb.collection("users").authRefresh();
-      }
-    } catch {
-      pb.authStore.clear();
-    }
-  }
+  await restoreVerifiedSession(pb, pbAuthValue);
 
+  return pb;
+}
+
+/** Las acciones del CRM exigen sesión verificada, además de las reglas de PB. */
+export async function requireServerClient() {
+  const pb = await createServerClient();
+  if (!pb.authStore.isValid || !pb.authStore.record?.id) throw new Error("No autenticado");
   return pb;
 }
 
@@ -32,7 +29,7 @@ export async function createServerClient() {
 export async function getServerUser(pb: Awaited<ReturnType<typeof createServerClient>>) {
   try {
     const model = pb.authStore.model;
-    if (!model) return null;
+    if (!pb.authStore.isValid || !model) return null;
     // model ya viene validado por authRefresh en createServerClient
     return model as unknown as {
       id: string;

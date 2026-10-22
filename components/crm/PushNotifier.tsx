@@ -24,14 +24,20 @@ export function PushNotifier() {
     setBusy(true);
     try {
       const reg = await navigator.serviceWorker.ready;
+      const applicationServerKey = urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "");
+      if (applicationServerKey.length !== 65) throw new Error("Falta configurar la clave pública de notificaciones");
       // Reusar la suscripción existente si la hay; si no, crear una.
       let sub = await reg.pushManager.getSubscription();
+      const previousKey = sub?.options.applicationServerKey;
+      if (sub && (!previousKey || new Uint8Array(previousKey).length !== applicationServerKey.length ||
+          new Uint8Array(previousKey).some((byte, index) => byte !== applicationServerKey[index]))) {
+        await sub.unsubscribe();
+        sub = null;
+      }
       if (!sub) {
         sub = await reg.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(
-            process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ""
-          ),
+          applicationServerKey,
         });
       }
       const json = sub.toJSON();
@@ -54,12 +60,10 @@ export function PushNotifier() {
 
   useEffect(() => {
     if (!supported) return;
-    navigator.serviceWorker.register("/sw.js").catch((e) => console.error("SW:", e));
-    // Si el permiso ya está concedido (pero quizá la suscripción se perdió),
-    // registrar automáticamente al montar.
-    if (Notification.permission === "granted") {
-      ensureRegistered();
-    }
+    navigator.serviceWorker.register("/sw.js").then(async () => {
+      // Sincronizar después del registro, también tras rotar la clave VAPID.
+      if (Notification.permission === "granted") await ensureRegistered();
+    }).catch((e) => console.error("SW:", e));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supported]);
 

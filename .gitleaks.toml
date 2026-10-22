@@ -1,0 +1,8 @@
+[extend]
+useDefault = true
+
+[[rules]]
+id = "literal-password"
+description = "Password literal in source"
+regex = '''(?i)(?:pbpass|password|passwd|secret)\s*[:=]\s*["']([a-zA-Z0-9_!@#$%^&*+=/.-]{10,})["']'''
+secretGroup = 1

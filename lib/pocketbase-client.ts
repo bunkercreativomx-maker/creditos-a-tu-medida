@@ -19,6 +19,7 @@ export function createClient() {
         httpOnly: false,
         secure: location.protocol === "https:",
         sameSite: "lax",
+        secure: window.location.protocol === "https:",
         path: "/",
       }, "pb_auth");
     });

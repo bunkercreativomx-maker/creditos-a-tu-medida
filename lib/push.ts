@@ -1,38 +1,31 @@
 import webpush from "web-push";
+import { isAllowedPushEndpoint } from "@/lib/push-security";
 
-/**
- * Configuración de Web Push (VAPID).
- * Usamos un par hardcodeado VERIFICADO (las pruebas manuales a producción lo
- * confirman). Las env vars de Vercel pueden estar corruptas/desalineadas y
- * provocar que el serverless firme con un par incorrecto → FCM rechaza el
- * envío en silencio. Fuerzo el par conocido para garantizar la entrega.
- * - VAPID_PUBLIC_KEY: pública, se expone al navegador (para suscribirse).
- * - VAPID_PRIVATE_KEY: secreta, solo en el servidor (para firmar envíos).
- * - VAPID_SUBJECT: mailto o https de contacto (requerido por los push services).
- */
-export const VAPID_PUBLIC_KEY =
-  "BGmxd6cI5SFI_VNC-KfXeiejqkpp4YW28BuDUEA5t7Yi9LuYhEz48V8Tzl3Yvj9F7CouGnJJNyLNlUlZ_JUAEf0";
+export const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
 
-const VAPID_PRIVATE_KEY =
-  "XZ2rDjSBvZFITzBwCQUyPHLZkNkqnaTRvrxiCIiVw8E";
-const VAPID_SUBJECT = "mailto:admin@creditos.app";
+function configureVapid(): boolean {
+  const privateKey = process.env.VAPID_PRIVATE_KEY;
+  const subject = process.env.VAPID_SUBJECT;
+  if (!VAPID_PUBLIC_KEY || !privateKey || !subject) return false;
+  webpush.setVapidDetails(subject, VAPID_PUBLIC_KEY, privateKey);
+  return true;
+}
 
-webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
-
-/** Envía una notificación push a una suscripción. Devuelve true si fue exitoso. */
+/** true: enviado; false: expirado; null: fallo temporal o configuración ausente. */
 export async function sendPush(
   subscription: { endpoint: string; keys: { p256dh: string; auth: string } },
   payload: { title: string; body: string; url?: string; badge?: number }
-): Promise<boolean> {
+): Promise<boolean | null> {
   try {
+    if (!isAllowedPushEndpoint(subscription.endpoint) || !configureVapid()) return null;
     await webpush.sendNotification(subscription, JSON.stringify(payload), { TTL: 60 });
     return true;
   } catch (err) {
     // 404/410 = suscripción expirada/eliminada; el llamador decide si la limpia.
     const status = (err as { statusCode?: number })?.statusCode;
     if (status === 404 || status === 410) return false;
-    console.error("Error enviando push:", (err as Error)?.message ?? err);
-    return false;
+    console.error("Error enviando push (sin eliminar la suscripción):", status ?? "configuración/transporte");
+    return null;
   }
 }
 
@@ -81,7 +74,7 @@ export async function notifyNewLead(lead: { nombre?: string | null; apellido?: s
         { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
         { title, body, url: "/crm", badge }
       );
-      if (!ok) dead.push(s.id);
+      if (ok === false) dead.push(s.id);
     }
     for (const id of dead) {
       await pb.collection("push_subscriptions").delete(id).catch(() => {});
@@ -140,7 +133,7 @@ export async function notifyWebFormNeedsAdvisor(lead: {
         { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
         { title, body, url: "/crm", badge }
       );
-      if (!ok) dead.push(s.id);
+      if (ok === false) dead.push(s.id);
     }
     for (const id of dead) {
       await pb.collection("push_subscriptions").delete(id).catch(() => {});
@@ -196,7 +189,7 @@ export async function notifyNeedsAdvisor(leadId?: string | null) {
         { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
         { title, body, url: "/crm/conversaciones", badge }
       );
-      if (!ok) dead.push(s.id);
+      if (ok === false) dead.push(s.id);
     }
     for (const id of dead) {
       await pb.collection("push_subscriptions").delete(id).catch(() => {});

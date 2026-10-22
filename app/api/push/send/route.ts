@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
         { title, body: text, url }
       );
       if (ok) sent++;
-      else dead.push(s.id);
+      else if (ok === false) dead.push(s.id);
     }
     // Limpiar suscripciones expiradas (404/410)
     if (dead.length > 0) {

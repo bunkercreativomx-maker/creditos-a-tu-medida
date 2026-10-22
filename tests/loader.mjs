@@ -19,6 +19,8 @@ function withExtension(base) {
 
 registerHooks({
   resolve(specifier, context, nextResolve) {
+    // No reinterpretar imports CommonJS de dependencias como URLs ESM.
+    if (context.parentURL?.includes("/node_modules/")) return nextResolve(specifier, context);
     if (specifier.startsWith("@/")) {
       const base = resolve(ROOT, specifier.slice(2));
       const target = withExtension(base);
