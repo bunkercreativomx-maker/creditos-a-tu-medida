@@ -3,6 +3,7 @@ import { Fraunces, Manrope } from "next/font/google";
 import "./globals.css";
 import { FloatingWhatsApp } from "@/components/site/FloatingWhatsApp";
 import { MetaPixel } from "@/components/site/MetaPixel";
+import { WhatsAppAttribution } from "@/components/site/WhatsAppAttribution";
 import { SITE } from "@/lib/site-content";
 
 const fraunces = Fraunces({
@@ -71,6 +72,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {children}
         <FloatingWhatsApp />
         <MetaPixel />
+        <WhatsAppAttribution />
       </body>
     </html>
   );

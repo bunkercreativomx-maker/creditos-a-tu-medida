@@ -1,3 +1,4 @@
+import { etiquetaFuente } from "@/lib/fuente";
 import { notFound } from "next/navigation";
 import { createServerClient } from "@/lib/pocketbase-server";
 import { PB_URL } from "@/lib/pocketbase";
@@ -104,6 +105,11 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium uppercase text-slate-500">
             {lead.origen === "whatsapp" ? "WhatsApp" : "Formulario web"}
           </span>
+          {lead.fuente && (
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+              📣 {etiquetaFuente(lead.fuente)} · {lead.fuente}
+            </span>
+          )}
           {isAdmin && (
             <DeleteLeadButton
               leadId={lead.id}

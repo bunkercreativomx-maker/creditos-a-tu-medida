@@ -14,6 +14,7 @@
 // Sin secretos: el payload de Zernio no trae la API key, pero NO se loguean
 // headers ni el valor de ninguna variable de entorno.
 
+import { extraerFuente } from "@/lib/fuente";
 import {
   normalizePhone,
   isValidMexicanMobile,
@@ -164,6 +165,8 @@ export async function procesarEntrante(
   }
 
   const telefonoOk = telefono as string;
+  // Atribución: "(Ref: FB-…)" que agrega el sitio al mensaje prellenado.
+  const fuente = extraerFuente(texto);
 
   // Marca el evento como procesado ANTES del trabajo lento (evita reintentos).
   await pb.collection("processed_webhook_events").create({ event_id: event.id });
@@ -185,6 +188,10 @@ export async function procesarEntrante(
       await pb.collection("leads").update(leadId, { nombre: parsed.nombre });
     }
     esRecurrente = Boolean(String(nombreExistente ?? "").trim());
+    // Solo se registra la PRIMERA fuente conocida; nunca se sobrescribe.
+    if (fuente && !String(existingLead.fuente ?? "").trim()) {
+      await pb.collection("leads").update(leadId, { fuente }).catch(() => {});
+    }
     const statusActual = String(existingLead.status ?? "");
     const estabaArchivado = Boolean(existingLead.archivado);
     const estaCerrado = statusActual === "cerrado_ganado" || statusActual === "cerrado_perdido";
@@ -204,6 +211,7 @@ export async function procesarEntrante(
       nombre: parsed.nombre ?? null,
       origen: "whatsapp",
       status: "nuevo",
+      ...(fuente ? { fuente } : {}),
     });
     leadId = (newLead as { id: string }).id;
     esLeadNuevo = true;

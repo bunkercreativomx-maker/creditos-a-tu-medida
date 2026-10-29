@@ -1,5 +1,6 @@
 "use client";
 
+import { etiquetaFuente } from "@/lib/fuente";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition, useState } from "react";
@@ -94,6 +95,14 @@ export function LeadCard({
             {origen}
           </span>
         </div>
+        {etiquetaFuente(lead.fuente) && (
+          <span
+            title={lead.fuente ?? ""}
+            className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800"
+          >
+            📣 {etiquetaFuente(lead.fuente)}
+          </span>
+        )}
 
         <div className="mt-1.5 flex items-center gap-1.5 text-xs text-slate-500">
           <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">

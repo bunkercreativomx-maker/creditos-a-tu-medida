@@ -55,6 +55,8 @@ export type PbLead = {
   status: LeadStatus;
   asignado_a: string | null;
   archivado?: boolean | null;
+  /** Código de atribución "(Ref: …)" del primer mensaje de WhatsApp (p.ej. FB-VIDEO1, WEB). */
+  fuente?: string | null;
   // Señales Meta (CAPI) guardadas al crear el lead desde el sitio
   meta_fbp?: string | null;
   meta_fbc?: string | null;
