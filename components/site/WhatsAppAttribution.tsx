@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { slugCodigo } from "@/lib/fuente";
+import { WHATSAPP_NUMBER } from "@/lib/site-content";
 
 // Agrega a TODOS los enlaces de WhatsApp del sitio un mensaje prellenado con
 // "(Ref: CODIGO)" para que el CRM registre de dónde vino el lead:
@@ -49,12 +50,19 @@ export function mensajeWhatsApp(codigo: string): string {
 
 export function WhatsAppAttribution() {
   useEffect(() => {
+    const negocio = WHATSAPP_NUMBER.replace(/\D/g, "");
     const codigo = fuenteActual();
     const texto = mensajeWhatsApp(codigo);
     const reescribir = (a: HTMLAnchorElement) => {
       try {
+        // El CRM comparte el layout raíz (y la navegación es SPA): ahí los
+        // enlaces wa.me apuntan al CLIENTE y NO llevan el mensaje del sitio.
+        if (window.location.pathname.startsWith("/crm")) return;
         const u = new URL(a.href);
         if (!/(^|\.)wa\.me$|api\.whatsapp\.com$/.test(u.hostname)) return;
+        // Solo el número del negocio (wa.me/<num> o api.whatsapp.com/send?phone=<num>).
+        const num = (u.searchParams.get("phone") || u.pathname).replace(/\D/g, "");
+        if (num !== negocio) return;
         if (u.searchParams.get("text")) return; // respeta mensajes ya definidos
         u.searchParams.set("text", texto);
         a.href = u.toString();

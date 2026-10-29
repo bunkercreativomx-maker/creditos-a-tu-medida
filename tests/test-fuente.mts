@@ -92,3 +92,14 @@ test("lead existente: se registra la fuente si no tenía y NUNCA se sobrescribe"
   await esperar();
   assert.equal(mock.collections["leads"][0].fuente, "FB-A");
 });
+
+test("quitarRef: el bot no ve la atribución (campaña 'REQUISITOS' no escala a asesor)", async () => {
+  const { quitarRef } = await import("@/lib/fuente.ts");
+  const { esPreguntaDeAsesor, pideUbicacion } = await import("@/lib/intenciones.ts");
+  const msg = "Hola, quiero información sobre un crédito. (Ref: FB-REQUISITOS-UBICACION)";
+  assert.equal(quitarRef(msg), "Hola, quiero información sobre un crédito.");
+  assert.equal(esPreguntaDeAsesor(quitarRef(msg)), false);
+  assert.equal(pideUbicacion(quitarRef(msg)), false);
+  assert.equal(quitarRef("(Ref: WEB)"), "");
+  assert.equal(quitarRef("sin referencia"), "sin referencia");
+});

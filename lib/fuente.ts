@@ -25,6 +25,18 @@ export function extraerFuente(texto: string | null | undefined): string | null {
   return m ? m[1].toUpperCase() : null;
 }
 
+/**
+ * Quita la referencia "(Ref: CODIGO)" del texto para que los clasificadores
+ * del bot no la interpreten (p. ej. una campaña "FB-REQUISITOS" disparaba
+ * esPreguntaDeAsesor y escalaba el primer mensaje).
+ */
+export function quitarRef(texto: string): string {
+  return texto
+    .replace(/\(\s*Ref\s*:\s*[A-Za-z0-9][A-Za-z0-9-]{0,40}\s*\)/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /** Etiqueta legible para el CRM. */
 export function etiquetaFuente(codigo: string | null | undefined): string | null {
   if (!codigo) return null;

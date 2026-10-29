@@ -33,6 +33,7 @@ import {
 } from "@/lib/intenciones";
 import type { BotTurnResult, BotTurnResultWithError } from "@/lib/bot";
 import type { ParsedInbound } from "@/lib/zernio";
+import { quitarRef } from "@/lib/fuente";
 
 /** Últimos N mensajes de contexto para el LLM (los MÁS RECIENTES, no los viejos). */
 const HISTORIA_MAX_MSGS = 30;
@@ -268,7 +269,9 @@ export async function procesarTurnoBot(
     // OJO: el `url` del adjunto entrante de WhatsApp NO es público — apunta al
     // endpoint autenticado de Zernio —, así que se pasan también mediaId y
     // accountId para que el STT descargue los bytes con la credencial.
-    let textoHoy = String(parsed.text ?? "").trim();
+    // Sin la atribución "(Ref: …)" del sitio: no debe disparar clasificadores.
+    const textoCrudo = String(parsed.text ?? "").trim();
+    let textoHoy = quitarRef(textoCrudo) || (textoCrudo ? "Hola" : "");
     const esAudio = (t: string, original?: string | null) =>
       /^(audio|voice|ptt|ogg|opus)$/i.test(t || "") || /^(audio|voice)$/i.test(original || "");
     const audioAtt = (parsed.attachments ?? []).find((a) =>
