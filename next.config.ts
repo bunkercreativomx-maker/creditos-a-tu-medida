@@ -11,6 +11,8 @@ const BLOG_HUB = "https://blog.bunkerank.com/s/n35lrwj1jv35394";
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: path.resolve(__dirname),
+  // Coolify (Docker) construye con NEXT_OUTPUT=standalone; Vercel no lo usa.
+  ...(process.env.NEXT_OUTPUT === "standalone" ? { output: "standalone" as const } : {}),
   // Blog servido por Bunker Rank (hub multi-cliente) en creditoatumedida.com/blog.
   async rewrites() {
     return {

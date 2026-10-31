@@ -23,7 +23,7 @@ export async function GET() {
   return NextResponse.json({
     ok: true,
     route: "zernio-webhook",
-    sha: (process.env.VERCEL_GIT_COMMIT_SHA ?? "?").slice(0, 7),
+    sha: (process.env.VERCEL_GIT_COMMIT_SHA || process.env.SOURCE_COMMIT || "?").slice(0, 7),
   });
 }
 
