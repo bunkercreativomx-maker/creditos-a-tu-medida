@@ -13,6 +13,8 @@ import { useEffect } from "react";
  *  - Contact: clic en cualquier enlace de WhatsApp o teléfono
  * No se envía ningún dato personal por el navegador (política financiera de Meta);
  * la coincidencia de usuario va por Conversions API desde el servidor, con hash.
+ * Sin <noscript><img>: bots que no ejecutan JS lo pedían con "&amp;ev=" sin
+ * decodificar → Meta lo registraba como __missing_event (evento sin nombre, sin URL).
  */
 // ID público del Pixel (no es secreto). Se puede sobreescribir con la variable en Vercel.
 export const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID || "1401885575462193";
@@ -62,11 +64,6 @@ t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
 document,'script','https://connect.facebook.net/en_US/fbevents.js');
 fbq('init','${META_PIXEL_ID}');`}
       </Script>
-      <noscript>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img height="1" width="1" style={{ display: "none" }} alt=""
-          src={`https://www.facebook.com/tr?id=${META_PIXEL_ID}&ev=PageView&noscript=1`} />
-      </noscript>
     </>
   );
 }
