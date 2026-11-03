@@ -2,7 +2,7 @@
 
 import Script from "next/script";
 import { usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 /**
  * Meta Pixel (solo sitio público, nunca /crm).
@@ -35,8 +35,13 @@ export function MetaPixel() {
   const pathname = usePathname();
   const enCrm = pathname?.startsWith("/crm") || pathname?.startsWith("/login");
 
+  // El PageView de la PRIMERA carga lo dispara el propio snippet (después del
+  // init), así no depende de que el script ya exista cuando corre el efecto.
+  // Este efecto sólo cubre los cambios de ruta posteriores.
+  const primera = useRef(true);
   useEffect(() => {
     if (!META_PIXEL_ID || enCrm) return;
+    if (primera.current) { primera.current = false; return; }
     fbq()?.("track", "PageView");
   }, [pathname, enCrm]);
 
@@ -62,7 +67,8 @@ n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
 n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
 t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
 document,'script','https://connect.facebook.net/en_US/fbevents.js');
-fbq('init','${META_PIXEL_ID}');`}
+fbq('init','${META_PIXEL_ID}');
+fbq('track','PageView');`}
       </Script>
     </>
   );
