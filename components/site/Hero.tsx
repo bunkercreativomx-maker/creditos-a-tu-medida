@@ -10,7 +10,7 @@ const ease = [0.22, 1, 0.36, 1] as const;
 
 const STATS = [
   { value: 8, suffix: "+", label: "años asesorando" },
-  { value: 0, prefix: "$", suffix: "", label: "te cobramos por asesorarte" },
+  { value: 0, prefix: "$", suffix: "", label: "de costo por la asesoría" },
   { value: 100, suffix: "%", label: "empresa mexicana" },
 ];
 
