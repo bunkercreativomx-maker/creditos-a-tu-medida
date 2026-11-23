@@ -11,7 +11,7 @@ export function TiposCredito() {
         <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-navy-900 sm:text-4xl">
           Nuestros tipos de crédito
         </h2>
-        <p className="mt-3 text-ink-600">Encuentra el crédito que mejor se adapta a tus necesidades</p>
+        <p className="mt-3 text-ink-600">Te ayudamos a encontrar el crédito que se adapta a tus necesidades</p>
       </Reveal>
 
       <RevealGroup className="mt-14 grid gap-6 sm:grid-cols-2">

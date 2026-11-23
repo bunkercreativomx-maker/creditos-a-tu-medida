@@ -11,17 +11,15 @@ export function Sectores() {
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gold-100 text-gold-600">
               <CheckBadge />
             </span>
-            <h2 className="font-display text-xl font-semibold text-navy-900">Instituciones que atendemos</h2>
+            <h2 className="font-display text-xl font-semibold text-navy-900">A quién asesoramos</h2>
           </div>
           <p className="mt-3 text-sm text-ink-600">
-            Créditos vía nómina para trabajadores y pensionados de instituciones con convenio.
+            Asesoría para pensionados y jubilados del IMSS, ISSSTE, CFE, Pemex y SNTE Sección 8. No estamos afiliados a estas instituciones.
           </p>
           <ul className="mt-6 grid grid-cols-2 gap-3">
             {[
               { nombre: "Pensionados", img: "/fotos/sector-pensionado.webp" },
               { nombre: "Jubilados", img: "/fotos/sector-jubilado.webp" },
-              { nombre: "Gobierno", img: "/fotos/sector-gobierno.webp" },
-              { nombre: "Educación", img: "/fotos/sector-educacion.webp" },
             ].map((sector) => (
               <li
                 key={sector.nombre}

@@ -86,8 +86,8 @@ export function ContactForm() {
 
   return (
     <div className="rounded-3xl border border-navy-900/8 bg-white p-6 shadow-[0_1px_2px_rgba(10,22,40,0.04)] sm:p-9">
-      <h3 className="text-center font-display text-2xl font-semibold text-navy-900">Solicita tu crédito ahora</h3>
-      <p className="mt-1 text-center text-sm text-ink-600">Un asesor te contactará en menos de 24 horas</p>
+      <h3 className="text-center font-display text-2xl font-semibold text-navy-900">Inicia tu trámite ahora</h3>
+      <p className="mt-1 text-center text-sm text-ink-600">Un asesor te contactará en menos de 24 horas. La asesoría no tiene costo. Al enviar aceptas nuestro <a href="/privacidad" className="underline">Aviso de Privacidad</a>.</p>
 
       <Stepper current={step} />
 

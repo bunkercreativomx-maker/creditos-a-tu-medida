@@ -89,7 +89,7 @@ export function RapidFunnel() {
             ⚡ Acción rápida · 60 segundos
           </span>
           <h2 className="font-display text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl">
-            ¿Necesitas tu crédito{" "}
+            ¿Necesitas un crédito{" "}
             <span className="italic text-gold-300 drop-shadow-[0_0_18px_rgba(212,175,55,0.7)]">
               HOY?
             </span>
@@ -97,15 +97,15 @@ export function RapidFunnel() {
           <ul className="space-y-3 text-lg text-cream-50/90">
             <li className="flex items-start gap-3">
               <span className="mt-1 text-gold-300">✓</span>
-              Aprobado y depositado el mismo día si solicitas antes de las 3:00 pm.
+              Si inicias antes de las 3:00 pm y la financiera lo aprueba, el depósito puede ser el mismo día.
             </li>
             <li className="flex items-start gap-3">
               <span className="mt-1 text-gold-300">✓</span>
-              Sin aval, sin historial perfecto y sin comisiones ocultas.
+              No te cobramos por asesorarte ni por hacer tu trámite.
             </li>
             <li className="flex items-start gap-3">
               <span className="mt-1 text-gold-300">✓</span>
-              Asesoría personalizada de principio a fin.
+              Un asesor hace el trámite contigo de principio a fin.
             </li>
           </ul>
           <p className="text-sm text-cream-50/70">
@@ -122,7 +122,7 @@ export function RapidFunnel() {
               </span>
               <h3 className="font-display text-2xl font-semibold">¡Solicitud recibida!</h3>
               <p className="max-w-sm text-ink-600">
-                Un asesor te contactará muy pronto para darle seguimiento a tu crédito.
+                Un asesor te contactará muy pronto para darle seguimiento a tu trámite.
               </p>
               <a
                 href={WHATSAPP_LINK}
@@ -136,7 +136,7 @@ export function RapidFunnel() {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
-              <h3 className="font-display text-2xl font-semibold">Solicita tu crédito ahora</h3>
+              <h3 className="font-display text-2xl font-semibold">Inicia tu trámite ahora</h3>
               <p className="text-sm text-ink-500">
                 Solo 3 campos · Entra directo con un asesor.
               </p>
@@ -187,11 +187,12 @@ export function RapidFunnel() {
                 disabled={estado === "enviando"}
                 className="w-full rounded-full bg-[#25D366] py-3.5 text-base font-semibold text-white shadow-[0_10px_30px_-6px_rgba(37,211,102,0.7)] transition hover:bg-[#1ebe5b] disabled:opacity-60"
               >
-                {estado === "enviando" ? "Enviando..." : "Solicitar mi crédito →"}
+                {estado === "enviando" ? "Enviando..." : "Quiero que me asesoren →"}
               </button>
 
               <p className="text-center text-xs text-ink-400">
-                Al enviar aceptas que un asesor te contacte. Sin spam, sin compromiso.
+                Al enviar aceptas que un asesor te contacte y el tratamiento de tus datos según nuestro{" "}
+                <a href="/privacidad" className="underline">Aviso de Privacidad</a>. Sin compromiso.
               </p>
             </form>
           )}

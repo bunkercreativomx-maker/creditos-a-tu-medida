@@ -67,7 +67,7 @@ export function Countdown() {
         </span>
       </span>
       <span className="text-sm font-medium text-cream-50/70">
-        {esHoy ? "para tu crédito el mismo día" : "para tu crédito mañana"}
+        {esHoy ? "para iniciar tu trámite hoy" : "para iniciar tu trámite"}
       </span>
     </div>
   );

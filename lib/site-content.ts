@@ -9,7 +9,7 @@ export const SITE = {
   horario: "Lunes a Viernes: 9:00 am – 6:00 pm",
 };
 
-export const SECTORES = ["Pensionados", "Jubilados", "Gobierno", "Educación"];
+export const SECTORES = ["Pensionados", "Jubilados"];
 
 export const GENEROS = [
   { value: "masculino", label: "Masculino" },
@@ -63,14 +63,14 @@ export const TIPOS_CREDITO = [
     icon: "cashDelivery" as const,
     titulo: "Crédito nuevo",
     descripcion:
-      "¿Primera vez con nosotros? Solicita tu crédito vía nómina con un proceso simple y asesoría personalizada de principio a fin.",
+      "¿Primera vez? Te ayudamos a solicitar tu crédito vía nómina ante la financiera, con asesoría de principio a fin y sin costo.",
     color: "emerald" as const,
   },
   {
     icon: "renew" as const,
     titulo: "Renovación de tu crédito",
     descripcion:
-      "¿Ya eres cliente? Renueva con mejores beneficios: paga menos al mes y recibe dinero extra en el proceso.",
+      "¿Ya tienes un crédito vía nómina? Te ayudamos a revisar si te conviene renovarlo y hacemos el trámite por ti.",
     color: "blue" as const,
   },
 ];
@@ -78,24 +78,24 @@ export const TIPOS_CREDITO = [
 export const BENEFICIOS = [
   {
     icon: "calendarPay" as const,
-    titulo: "Dinero el mismo día",
+    titulo: "Depósito el mismo día*",
         descripcion:
-          "Solicita antes de las 3:00 pm y tu crédito se aprueba y deposita el mismo día. Después de esa hora, el depósito cae al día siguiente.",
+          "*Si inicias tu trámite antes de las 3:00 pm y la financiera aprueba tu crédito, el depósito puede ser el mismo día; si no, al día hábil siguiente.",
   },
   {
     icon: "noGuarantee" as const,
-    titulo: "Sin calificación mínima",
-    descripcion: "No necesitas historial crediticio perfecto para solicitar.",
+    titulo: "Asesoría sin costo",
+    descripcion: "No te cobramos por asesorarte ni por hacer tu trámite.",
   },
   {
     icon: "noPawn" as const,
-    titulo: "Sin comisiones ocultas",
-    descripcion: "Procesos simples, rápidos y seguros, sin sorpresas.",
+    titulo: "Te explicamos todo",
+    descripcion: "La financiera te entrega tu contrato con todas las condiciones y un asesor te lo explica antes de firmar.",
   },
   {
     icon: "shield" as const,
-    titulo: "Más de 8 años otorgando créditos",
-    descripcion: "Empresa 100% mexicana, con un asesor que lo acompaña de principio a fin.",
+    titulo: "Más de 8 años asesorando",
+    descripcion: "Empresa 100% mexicana. No estamos afiliados al IMSS, ISSSTE, CFE, Pemex ni al SNTE.",
   },
   {
     icon: "fast" as const,
@@ -105,13 +105,13 @@ export const BENEFICIOS = [
   {
     icon: "renew" as const,
     titulo: "Trato cercano",
-    descripcion: "Procesos ágiles pensados para pensionados y trabajadores con convenio.",
+    descripcion: "Procesos ágiles pensados para pensionados y jubilados.",
   },
 ];
 
 export const PROCESO = [
   { icon: "headset" as const, titulo: "Contacto con el cliente", descripcion: "Nos escribes por WhatsApp o llenas el formulario." },
-  { icon: "checklist" as const, titulo: "Análisis y documentos", descripcion: "Revisamos tu caso y recolectamos tus documentos." },
-  { icon: "signature" as const, titulo: "Firma de papelería", descripcion: "Firmas tu contrato de forma simple y segura." },
-  { icon: "cashDelivery" as const, titulo: "Entrega del crédito", descripcion: "Recibes tu dinero el mismo día si solicitas antes de las 3:00 pm; después de esa hora, el depósito cae al día siguiente." },
+  { icon: "checklist" as const, titulo: "Análisis y documentos", descripcion: "Revisamos tu caso y armamos tu expediente para la financiera." },
+  { icon: "signature" as const, titulo: "Firma de papelería", descripcion: "Firmas tu contrato directamente con la financiera." },
+  { icon: "cashDelivery" as const, titulo: "Depósito", descripcion: "La financiera deposita tu crédito; si iniciaste antes de las 3:00 pm y se aprueba, puede ser el mismo día." },
 ];

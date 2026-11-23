@@ -27,12 +27,14 @@ export function Footer() {
           <div>
             <h4 className="text-xs font-semibold uppercase tracking-wider text-gold-400">Legales</h4>
             <ul className="mt-3 space-y-2 text-sm">
-              <li>Política de tratamiento de datos</li>
-              <li>Aviso de Privacidad Integral</li>
-              <li>Unidad Especializada de Atención (UNE)</li>
+              <li>
+                <a href="/privacidad" className="hover:text-gold-300">
+                  Aviso de Privacidad
+                </a>
+              </li>
               <li>
                 <a href="https://www.buro.gob.mx" target="_blank" rel="noopener noreferrer" className="hover:text-gold-300">
-                  Buró de Entidades Financieras (CONDUSEF)
+                  Consulta financieras en el Buró de Entidades Financieras (CONDUSEF)
                 </a>
               </li>
             </ul>
@@ -42,12 +44,13 @@ export function Footer() {
           <p>
             {SITE.brand} — Todos los derechos reservados {new Date().getFullYear()}.
           </p>
-          {/* TODO: sustituir por el CAT, tasa de interés y avisos regulatorios reales
-              confirmados con la financiera antes de publicar el sitio — son
-              cifras reguladas por CONDUSEF y no deben inventarse. */}
+          {/* Somos asesores (promotores) independientes: nunca publicar CAT, tasas ni comisiones propias. */}
           <p className="mt-1">
-            Costo Anual Total (CAT) y tasa de interés aplicable sujetos a evaluación individual —
-            consulta con tu asesor.
+            Créditos a tu medida es un asesor independiente de crédito vía nómina: te ayudamos con todo
+            el trámite y no cobramos por la asesoría. No otorgamos créditos; el crédito lo otorga una
+            entidad financiera y está sujeto a su aprobación. Las condiciones del crédito las define la
+            financiera y vienen en tu contrato. No estamos afiliados al IMSS, ISSSTE, CFE, Pemex ni al
+            SNTE. Requisitos y condiciones en creditoatumedida.com.
           </p>
         </div>
       </div>

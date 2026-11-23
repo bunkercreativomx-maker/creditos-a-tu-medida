@@ -516,7 +516,7 @@ export async function procesarTurnoBot(
       const saludo =
         esRecurrente && nombreCliente
           ? `¡Hola de nuevo, ${nombreCliente}! 👋 Le saluda Créditos a tu medida. Qué gusto que se comunique otra vez. Ya tengo sus datos registrados, así que podemos ir directo. ¿En qué le puedo ayudar hoy?`
-          : "¡Hola! Buen día 👋 Le saluda Créditos a tu medida. Con gusto le ayudo con su información de préstamo. ¿Me regala su nombre completo, por favor?";
+          : "¡Hola! Buen día 👋 Le saluda Créditos a tu medida. Somos asesores independientes de crédito vía nómina: le ayudamos con todo el trámite ante la financiera y la asesoría no tiene costo. ¿Me regala su nombre completo, por favor?";
       await responder(saludo);
       if (esLeadNuevo) {
         await notifyNewLeadToSlack({

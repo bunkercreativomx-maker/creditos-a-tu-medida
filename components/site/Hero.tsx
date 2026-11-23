@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { SECTORES, WHATSAPP_LINK } from "@/lib/site-content";
+import { WHATSAPP_LINK } from "@/lib/site-content";
 import { WhatsAppIcon } from "./WhatsAppIcon";
 import { AnimatedCounter } from "./AnimatedCounter";
 import { Countdown } from "./Countdown";
@@ -9,9 +9,9 @@ import { Countdown } from "./Countdown";
 const ease = [0.22, 1, 0.36, 1] as const;
 
 const STATS = [
-  { value: 20, suffix: "+", label: "años en el mercado" },
-  { value: 15, suffix: "h", label: "para tu crédito el mismo día" },
-  { value: 100, suffix: "%", label: "financiera mexicana" },
+  { value: 8, suffix: "+", label: "años asesorando" },
+  { value: 0, prefix: "$", suffix: "", label: "te cobramos por asesorarte" },
+  { value: 100, suffix: "%", label: "empresa mexicana" },
 ];
 
 export function Hero() {
@@ -22,7 +22,7 @@ export function Hero() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/fotos/hero-bg.webp"
-          alt="Cliente pensionado satisfecho revisando su crédito aprobado"
+          alt="Pensionado revisando su trámite de crédito vía nómina"
           className="h-full w-full object-cover object-[75%_center]"
         />
         {/* Degradado oscuro desde la izquierda para legibilidad y fusión */}
@@ -57,8 +57,8 @@ export function Hero() {
             transition={{ duration: 0.7, delay: 0.08, ease }}
             className="font-display text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl lg:text-6xl"
           >
-            Tu crédito aprobado y depositado <br />
-            <span className="italic text-gold-300">el mismo día</span>
+            Te hacemos todo el trámite <br />
+            <span className="italic text-gold-300">de tu crédito vía nómina</span>
           </motion.h1>
 
           <motion.p
@@ -67,8 +67,8 @@ export function Hero() {
             transition={{ duration: 0.7, delay: 0.16, ease }}
             className="max-w-xl text-lg leading-relaxed text-cream-50/85"
           >
-            Créditos para {SECTORES.join(", ")} de instituciones con convenio. Sin complicaciones,
-            sin comisiones ocultas, con asesoría personalizada de principio a fin.
+            Somos asesores independientes para pensionados y jubilados del IMSS, ISSSTE, CFE, Pemex y SNTE
+            Sección 8. Te ayudamos con todo el trámite ante la financiera, sin cobrarte por la asesoría.
           </motion.p>
 
           <motion.div
@@ -85,8 +85,8 @@ export function Hero() {
             transition={{ duration: 0.7, delay: 0.22, ease }}
             className="max-w-md text-base leading-relaxed text-cream-50/80"
           >
-            Solicita antes de las 3:00 pm y recibe tu crédito el mismo día. Después de esa hora,
-            tu crédito se deposita al día siguiente.
+            Si inicias tu trámite antes de las 3:00 pm y la financiera aprueba tu crédito, el depósito
+            puede ser el mismo día; si no, al día hábil siguiente.
           </motion.p>
 
           <motion.div
@@ -114,7 +114,7 @@ export function Hero() {
             {STATS.map((stat) => (
               <div key={stat.label}>
                 <div className="font-display text-2xl font-semibold text-gold-300 sm:text-3xl">
-                  <AnimatedCounter value={stat.value} suffix={stat.suffix} />
+                  <AnimatedCounter value={stat.value} prefix={"prefix" in stat ? stat.prefix : ""} suffix={stat.suffix} />
                 </div>
                 <p className="mt-1 text-xs leading-snug text-cream-50/70">{stat.label}</p>
               </div>

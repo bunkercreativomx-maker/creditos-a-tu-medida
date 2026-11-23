@@ -21,9 +21,9 @@ const manrope = Manrope({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://creditoatumedida.com"),
-  title: "Créditos a tu medida | Créditos vía nómina",
+  title: "Créditos a tu medida | Asesoría de crédito vía nómina",
   description:
-    "Créditos vía nómina para pensionados, jubilados, gobierno y educación. Aprobación rápida, sin complicaciones.",
+    "Asesores independientes de crédito vía nómina para pensionados y jubilados en Ciudad Juárez. Te ayudamos con todo el trámite, sin costo por la asesoría.",
   // Verificación de dominio de Meta (Business Manager > Seguridad de la marca > Dominios > Meta-tag)
   other: {
     "facebook-domain-verification":
