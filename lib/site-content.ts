@@ -4,7 +4,6 @@ export const WHATSAPP_LINK = `https://wa.me/${WHATSAPP_NUMBER}`;
 
 export const SITE = {
   brand: "Créditos a tu medida",
-  financiera: "Financiera Fortaleza, S.A. de C.V., SOFOM, E.N.R.",
   telefono: "656 374 8899",
   direccion: "Benjamin Franklin 3220, Int 22-D, Zona Pronaf 32315, Ciudad Juárez, Chihuahua",
   horario: "Lunes a Viernes: 9:00 am – 6:00 pm",
@@ -95,8 +94,8 @@ export const BENEFICIOS = [
   },
   {
     icon: "shield" as const,
-    titulo: "20+ años en el mercado",
-    descripcion: "Respaldados por Financiera Fortaleza, 100% mexicana.",
+    titulo: "Más de 8 años otorgando créditos",
+    descripcion: "Empresa 100% mexicana, con un asesor que lo acompaña de principio a fin.",
   },
   {
     icon: "fast" as const,

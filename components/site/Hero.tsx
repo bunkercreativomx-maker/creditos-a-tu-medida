@@ -48,7 +48,7 @@ export function Hero() {
             transition={{ duration: 0.6, ease }}
             className="rounded-full border border-gold-500/30 bg-gold-500/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-gold-300"
           >
-            Financiera Fortaleza · 100% mexicana · 20+ años
+            100% mexicana · Más de 8 años
           </motion.span>
 
           <motion.h1

@@ -6,7 +6,6 @@
 // NSS se contradecía (el prompt lo prohibía Y lo exigía). Todo sale de aquí.
 
 export const NOMBRE_EMPRESA = "Créditos a tu medida";
-export const RAZON_SOCIAL = "Financiera Fortaleza, S.A. de C.V., SOFOM, E.N.R.";
 
 export const DIRECCION_OFICIAL =
   "Benjamín Franklin 3220, Local 22D, Plaza de las Américas, Zona Pronaf, C.P. 32315, Cd. Juárez, Chihuahua";

@@ -9,7 +9,7 @@ export function Footer() {
           <div>
             <p className="font-display text-lg font-semibold text-cream-50">{SITE.brand}</p>
             <p className="mt-3 text-sm leading-relaxed">
-              Promotor de crédito vía nómina, en alianza con {SITE.financiera}.
+              Promotor de crédito vía nómina para pensionados y jubilados.
             </p>
           </div>
           <div>
@@ -40,14 +40,14 @@ export function Footer() {
         </div>
         <div className="mt-10 border-t border-cream-50/10 pt-6 text-xs text-cream-50/40">
           <p>
-            {SITE.financiera} — Todos los derechos reservados {new Date().getFullYear()}.
+            {SITE.brand} — Todos los derechos reservados {new Date().getFullYear()}.
           </p>
           {/* TODO: sustituir por el CAT, tasa de interés y avisos regulatorios reales
-              confirmados con Financiera Fortaleza antes de publicar el sitio — son
+              confirmados con la financiera antes de publicar el sitio — son
               cifras reguladas por CONDUSEF y no deben inventarse. */}
           <p className="mt-1">
             Costo Anual Total (CAT) y tasa de interés aplicable sujetos a evaluación individual —
-            consulta con tu asesor. Somos un organismo regulado por CONDUSEF y CNBV.
+            consulta con tu asesor.
           </p>
         </div>
       </div>

@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://creditoatumedida.com"),
   title: "Créditos a tu medida | Créditos vía nómina",
   description:
-    "Créditos vía nómina para pensionados, jubilados, gobierno y educación, en alianza con Financiera Fortaleza. Aprobación rápida, sin complicaciones.",
+    "Créditos vía nómina para pensionados, jubilados, gobierno y educación. Aprobación rápida, sin complicaciones.",
   // Verificación de dominio de Meta (Business Manager > Seguridad de la marca > Dominios > Meta-tag)
   other: {
     "facebook-domain-verification":
